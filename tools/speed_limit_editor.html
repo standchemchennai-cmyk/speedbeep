@@ -59,6 +59,19 @@
       <button id="locateBtn">My location</button>
     </div>
 
+    <div class="row2" style="margin-bottom:12px">
+      <div>
+        <label for="mapSource">Map source</label>
+        <select id="mapSource">
+          <option value="carto">CARTO Voyager</option>
+          <option value="esri">Esri World Street Map</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:end">
+        <button id="reloadMapBtn" style="width:100%">Reload map</button>
+      </div>
+    </div>
+
     <div id="status" class="status"><strong>Ready.</strong> Import a CSV or draw your first segment.</div>
 
     <div class="section">
@@ -90,7 +103,7 @@
       2. Click the start and end of one reasonably straight stretch of road.<br>
       3. Set its verified speed limit. Use several segments for curves or limit changes.<br>
       4. Export CSV and import it into SpeedBeep.<br><br>
-      Your work is also autosaved in this browser's local storage. The map uses OpenStreetMap tiles and therefore needs internet access; the CSV editor itself stays local.
+      Your work is also autosaved in this browser's local storage. The editor is local; the basemap needs internet access. Default tiles come from CARTO (OpenStreetMap data), with Esri available as a backup source.
     </div>
   </aside>
 
@@ -111,10 +124,31 @@
 
     const $ = id => document.getElementById(id);
     const map = L.map('map').setView([13.02, 80.22], 11);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 20,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+
+    const baseLayers = {
+      carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      }),
+      esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 20,
+        attribution: 'Tiles &copy; Esri'
+      })
+    };
+    let activeBaseLayer = null;
+
+    function setBaseLayer(key) {
+      if (!baseLayers[key]) key = 'carto';
+      if (activeBaseLayer) map.removeLayer(activeBaseLayer);
+      activeBaseLayer = baseLayers[key];
+      activeBaseLayer.addTo(map);
+      $('mapSource').value = key;
+      localStorage.setItem('speedbeep_map_source', key);
+      setStatus(`Using ${key === 'carto' ? 'CARTO Voyager' : 'Esri World Street Map'} basemap.`, 'Map:');
+    }
+
+    setBaseLayer(localStorage.getItem('speedbeep_map_source') || 'carto');
 
     const lineLayer = L.layerGroup().addTo(map);
     const editLayer = L.layerGroup().addTo(map);
@@ -245,6 +279,13 @@
       if (tempMarker) map.removeLayer(tempMarker);
       tempMarker = null;
     }
+
+    $('mapSource').onchange = () => setBaseLayer($('mapSource').value);
+    $('reloadMapBtn').onclick = () => {
+      const key = $('mapSource').value;
+      setBaseLayer(key);
+      setTimeout(() => map.invalidateSize(), 100);
+    };
 
     $('addBtn').onclick = () => {
       drawMode = true;
