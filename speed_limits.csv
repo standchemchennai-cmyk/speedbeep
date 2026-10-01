@@ -1,0 +1,6 @@
+# SpeedBeep local road database
+# One row = one straight road segment. Use several rows for a curved road.
+# corridor_m is the matching width around the segment.
+# margin_kph is how far above the legal limit before the warning starts.
+name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph
+SAMPLE - replace me,12.900000,80.220000,12.905000,80.225000,60,40,3
