@@ -3,4 +3,8 @@
 # corridor_m is the matching width around the segment.
 # margin_kph is how far above the legal limit before the warning starts.
 name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph
-SAMPLE - replace me,12.900000,80.220000,12.905000,80.225000,60,40,3
+Road segment 1,13.089052,80.248518,13.085897,80.248046,20,40,3
+Road segment 2,13.085918,80.248067,13.085667,80.252101,35,40,3
+Road segment 3,13.085647,80.252144,13.079044,80.252230,40,40,3
+Road segment 4,13.072274,80.249848,13.069286,80.240107,45,40,3
+Road segment 5,13.066373,80.263281,13.029384,80.232124,40,40,3
