@@ -19,9 +19,7 @@ input[type=file]{display:none}.status{padding:9px 10px;border:1px solid var(--bo
 .section{border-top:1px solid var(--border);padding-top:13px;margin-top:13px}label{display:block;font-size:12px;color:var(--muted);margin:9px 0 4px}
 input[type=text],input[type=number],select{width:100%;padding:9px 10px;border-radius:7px;border:1px solid var(--border);background:#111419;color:var(--text)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:9px}.coords{font-variant-numeric:tabular-nums;font-size:11px;color:var(--muted);line-height:1.5}
-#segmentList{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:34vh;overflow:auto}.seg{border:1px solid var(--border);border-radius:8px;padding:9px;background:#111419;cursor:pointer}
-.seg:hover{border-color:#616c78}.seg.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}.seg-title{display:flex;justify-content:space-between;gap:10px;align-items:center}
-.seg-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pill{flex:0 0 auto;border-radius:999px;padding:2px 7px;font-size:11px;background:#272d37}.seg-meta{color:var(--muted);font-size:11px;margin-top:4px}
+#segmentList{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:34vh;overflow:auto}.seg{border:1px solid var(--border);border-radius:8px;padding:9px;background:#111419;cursor:pointer}.seg:hover{border-color:#616c78}.seg.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}.seg-title{display:flex;justify-content:space-between;gap:10px;align-items:center}.seg-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pill{flex:0 0 auto;border-radius:999px;padding:2px 7px;font-size:11px;background:#272d37}.seg-meta{color:var(--muted);font-size:11px;margin-top:4px}
 .legend{display:flex;gap:14px;align-items:center;font-size:11px;color:var(--muted);margin-top:8px}.swatch{display:inline-block;width:18px;height:5px;border-radius:4px;margin-right:5px;vertical-align:middle}.route{background:var(--route)}.selected-line{background:var(--accent)}
 .maplibregl-popup-content{background:#111419;color:#fff;border:1px solid var(--border);padding:8px 10px}.maplibregl-popup-tip{border-top-color:#111419!important}
 @media(max-width:780px){body{display:block;overflow:auto}aside{height:auto;border-right:0;border-bottom:1px solid var(--border)}#map{height:65vh}#segmentList{max-height:250px}}
@@ -30,7 +28,7 @@ input[type=text],input[type=number],select{width:100%;padding:9px 10px;border-ra
 <body>
 <aside>
 <h1>SpeedBeep CSV Editor</h1>
-<div class="sub">Edit <code>speed_limits.csv</code> visually. Saved and imported road segments are drawn directly on the map.</div>
+<div class="sub">Edit <code>speed_limits.csv</code> visually. Draw endpoints, then road-snap them so routes follow the street network instead of straight chords.</div>
 <div class="toolbar">
 <button id="addBtn" class="primary">+ Draw segment</button>
 <label class="file-label" for="csvFile">Import CSV</label><input id="csvFile" type="file" accept=".csv,text/csv">
@@ -61,43 +59,36 @@ input[type=text],input[type=number],select{width:100%;padding:9px 10px;border-ra
 </div>
 <label for="corridor">Road corridor / GPS matching distance (m)</label><input id="corridor" type="number" min="5" max="500" step="5">
 <div id="coords" class="coords"></div>
-<div class="toolbar"><button id="zoomBtn">Zoom to segment</button><button id="duplicateBtn">Duplicate</button><button id="deleteBtn" class="danger">Delete</button></div>
+<div class="toolbar"><button id="snapBtn" class="primary">Snap selected to road</button><button id="snapAllBtn">Snap all to roads</button><button id="zoomBtn">Zoom to route</button><button id="duplicateBtn">Duplicate</button><button id="deleteBtn" class="danger">Delete</button></div>
 </div>
 <div class="section help"><strong>How to use</strong><br>
 1. Import your current CSV or click <b>Draw segment</b>.<br>
-2. Click start and end points for one reasonably straight road stretch.<br>
-3. Routes remain visible: cyan = saved, yellow = selected.<br>
-4. Click a route or list entry to select it; drag the two yellow endpoint markers to refine it.<br>
-5. Export CSV and import it into SpeedBeep.<br><br>
-Work is autosaved in this browser. The basemap uses OpenFreeMap vector tiles and does not need an API key.
+2. Click the route start and end. New routes are automatically snapped to drivable roads.<br>
+3. For an imported straight route, select it and click <b>Snap selected to road</b>, or use <b>Snap all to roads</b>.<br>
+4. Cyan = saved route, yellow = selected. Dragging an endpoint marks it unsnapped until you snap it again.<br>
+5. Export CSV. Road shapes are converted into many short straight segments so the Android app can match them offline.<br><br>
+Work is autosaved in this browser. The map uses OpenFreeMap vector styles through MapLibre. Road snapping uses the public OSRM routing service and therefore needs internet access while editing.
 </div>
 </aside>
-<main id="map"></main>
-
+<div id="map"></div>
 <script src="https://unpkg.com/maplibre-gl@4.2.0/dist/maplibre-gl.js"></script>
 <script>
 'use strict';
-const STORAGE_KEY='speedbeep_segments_v1', MAP_SOURCE_KEY='speedbeep_map_source';
+const STORAGE_KEY='speedbeep_segments_v1',MAP_SOURCE_KEY='speedbeep_map_source';
 const DEFAULTS={limit_kph:60,corridor_m:40,margin_kph:3};
-const STYLES={
- liberty:'https://tiles.openfreemap.org/styles/liberty',
- bright:'https://tiles.openfreemap.org/styles/bright',
- positron:'https://tiles.openfreemap.org/styles/positron'
-};
+const STYLES={liberty:'https://tiles.openfreemap.org/styles/liberty',bright:'https://tiles.openfreemap.org/styles/bright',positron:'https://tiles.openfreemap.org/styles/positron'};
 const STYLE_NAMES={liberty:'OpenFreeMap Liberty',bright:'OpenFreeMap Bright',positron:'OpenFreeMap Positron'};
 let segments=[],selectedId=null,drawMode=false,firstPoint=null,nextId=1,startMarker=null,endMarker=null,tempMarker=null;
-const $=id=>document.getElementById(id);
-const savedStyle=STYLES[localStorage.getItem(MAP_SOURCE_KEY)]?localStorage.getItem(MAP_SOURCE_KEY):'liberty';
-$('mapSource').value=savedStyle;
-const map=new maplibregl.Map({container:'map',style:STYLES[savedStyle],center:[80.22,13.02],zoom:10});
-map.addControl(new maplibregl.NavigationControl(),'top-right');
-
-function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function status(text,strong=''){ $('status').innerHTML=strong?`<strong>${esc(strong)}</strong> ${esc(text)}`:esc(text) }
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function status(t,strong=''){ $('status').innerHTML=strong?`<strong>${esc(strong)}</strong> ${esc(t)}`:esc(t) }
 function makeId(){return nextId++}
+const savedStyle=localStorage.getItem(MAP_SOURCE_KEY);const initialStyle=STYLES[savedStyle]?savedStyle:'liberty';$('mapSource').value=initialStyle;
+const map=new maplibregl.Map({container:'map',style:STYLES[initialStyle],center:[80.22,13.02],zoom:11,attributionControl:true});
+map.addControl(new maplibregl.NavigationControl(),'top-right');
 function normalize(raw){
  const s={id:raw.id??makeId(),name:String(raw.name||'Unnamed road'),start_lat:Number(raw.start_lat),start_lon:Number(raw.start_lon),end_lat:Number(raw.end_lat),end_lon:Number(raw.end_lon),limit_kph:Number(raw.limit_kph??DEFAULTS.limit_kph),corridor_m:Number(raw.corridor_m??DEFAULTS.corridor_m),margin_kph:Number(raw.margin_kph??DEFAULTS.margin_kph)};
  if(![s.start_lat,s.start_lon,s.end_lat,s.end_lon,s.limit_kph,s.corridor_m,s.margin_kph].every(Number.isFinite))throw new Error('Invalid numeric value in segment');
+ if(Array.isArray(raw.path)&&raw.path.length>=2){const path=raw.path.map(p=>[Number(p[0]),Number(p[1])]).filter(p=>p.every(Number.isFinite));if(path.length>=2)s.path=path}
  return s;
 }
 function selected(){return segments.find(s=>s.id===selectedId)||null}
@@ -106,8 +97,9 @@ function loadLocal(){
  try{const raw=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');if(Array.isArray(raw))segments=raw.map(normalize)}catch(e){console.warn(e)}
  renderUI();
 }
+function routeCoords(s){return Array.isArray(s.path)&&s.path.length>=2?s.path:[[s.start_lon,s.start_lat],[s.end_lon,s.end_lat]]}
 function routeGeoJSON(){
- return {type:'FeatureCollection',features:segments.map(s=>({type:'Feature',properties:{id:s.id,name:s.name,limit:s.limit_kph,selected:s.id===selectedId?1:0},geometry:{type:'LineString',coordinates:[[s.start_lon,s.start_lat],[s.end_lon,s.end_lat]]}}))}
+ return {type:'FeatureCollection',features:segments.map(s=>({type:'Feature',properties:{id:s.id,name:s.name,limit:s.limit_kph,selected:s.id===selectedId?1:0,routed:Array.isArray(s.path)&&s.path.length>=2?1:0},geometry:{type:'LineString',coordinates:routeCoords(s)}}))}
 }
 function ensureRouteLayer(){
  if(!map.getSource('speedbeep-routes'))map.addSource('speedbeep-routes',{type:'geojson',data:routeGeoJSON()});
@@ -117,110 +109,61 @@ function ensureRouteLayer(){
   'line-opacity':0.95
  }});
 }
-function clearMarkers(){
- for(const m of [startMarker,endMarker,tempMarker])if(m)m.remove();
- startMarker=endMarker=tempMarker=null;
-}
+function clearMarkers(){for(const m of [startMarker,endMarker,tempMarker])if(m)m.remove();startMarker=endMarker=tempMarker=null}
 function renderMap(){
  if(!map.isStyleLoaded())return;
- ensureRouteLayer();
- map.getSource('speedbeep-routes').setData(routeGeoJSON());
+ ensureRouteLayer();map.getSource('speedbeep-routes').setData(routeGeoJSON());
  if(startMarker){startMarker.remove();startMarker=null} if(endMarker){endMarker.remove();endMarker=null}
  const s=selected(); if(!s)return;
  startMarker=new maplibregl.Marker({color:'#e6b800',draggable:true}).setLngLat([s.start_lon,s.start_lat]).addTo(map);
  endMarker=new maplibregl.Marker({color:'#e6b800',draggable:true}).setLngLat([s.end_lon,s.end_lat]).addTo(map);
- startMarker.on('dragend',()=>{const p=startMarker.getLngLat();s.start_lat=p.lat;s.start_lon=p.lng;save();renderAll()});
- endMarker.on('dragend',()=>{const p=endMarker.getLngLat();s.end_lat=p.lat;s.end_lon=p.lng;save();renderAll()});
+ startMarker.on('dragend',()=>{const p=startMarker.getLngLat();s.start_lat=p.lat;s.start_lon=p.lng;delete s.path;save();renderAll();status('Endpoint moved. Snap this route again to follow roads.','Route changed:')});
+ endMarker.on('dragend',()=>{const p=endMarker.getLngLat();s.end_lat=p.lat;s.end_lon=p.lng;delete s.path;save();renderAll();status('Endpoint moved. Snap this route again to follow roads.','Route changed:')});
 }
 function renderList(){
  const list=$('segmentList');list.innerHTML='';
- for(const s of segments){
-  const d=document.createElement('div');d.className='seg'+(s.id===selectedId?' selected':'');
-  d.innerHTML=`<div class="seg-title"><span class="seg-name">${esc(s.name)}</span><span class="pill">${s.limit_kph} km/h</span></div><div class="seg-meta">corridor ${s.corridor_m} m · warn +${s.margin_kph}</div>`;
-  d.onclick=()=>selectSegment(s.id,true);list.appendChild(d);
- }
+ for(const s of segments){const d=document.createElement('div');d.className='seg'+(s.id===selectedId?' selected':'');d.innerHTML=`<div class="seg-title"><span class="seg-name">${esc(s.name)}</span><span class="pill">${s.limit_kph} km/h</span></div><div class="seg-meta">${Array.isArray(s.path)&&s.path.length>=2?'road-snapped':'straight'} · corridor ${s.corridor_m} m · warn +${s.margin_kph}</div>`;d.onclick=()=>selectSegment(s.id,true);list.appendChild(d)}
  $('count').textContent=segments.length;
 }
-function renderEditor(){
- const s=selected();$('editor').hidden=!s;if(!s)return;
- $('name').value=s.name;$('limit').value=s.limit_kph;$('corridor').value=s.corridor_m;$('margin').value=s.margin_kph;
- $('coords').innerHTML=`<br>Start: ${s.start_lat.toFixed(6)}, ${s.start_lon.toFixed(6)}<br>End: ${s.end_lat.toFixed(6)}, ${s.end_lon.toFixed(6)}`;
-}
-function renderUI(){renderList();renderEditor()}
-function renderAll(){renderUI();renderMap()}
+function renderEditor(){const s=selected();$('editor').hidden=!s;if(!s)return;$('name').value=s.name;$('limit').value=s.limit_kph;$('corridor').value=s.corridor_m;$('margin').value=s.margin_kph;$('coords').innerHTML=`<br>Start: ${s.start_lat.toFixed(6)}, ${s.start_lon.toFixed(6)}<br>End: ${s.end_lat.toFixed(6)}, ${s.end_lon.toFixed(6)}<br>${Array.isArray(s.path)&&s.path.length>=2?`Road shape: ${s.path.length} points`:'Road shape: not snapped'}`}
+function renderUI(){renderList();renderEditor()}function renderAll(){renderUI();renderMap()}
 function selectSegment(id,zoom=false){selectedId=Number(id);drawMode=false;if(tempMarker){tempMarker.remove();tempMarker=null}firstPoint=null;renderAll();if(zoom)zoomSelected()}
-function zoomSelected(){
- const s=selected();if(!s)return;
- const b=new maplibregl.LngLatBounds([s.start_lon,s.start_lat],[s.end_lon,s.end_lat]);map.fitBounds(b,{padding:100,maxZoom:17,duration:500});
-}
-function fitAll(){
- if(!segments.length){status('No routes to fit.','Map:');return}
- const b=new maplibregl.LngLatBounds();
- segments.forEach(s=>{b.extend([s.start_lon,s.start_lat]);b.extend([s.end_lon,s.end_lat])});
- map.fitBounds(b,{padding:70,maxZoom:15,duration:500});
-}
-
+function zoomSelected(){const s=selected();if(!s)return;const b=new maplibregl.LngLatBounds();routeCoords(s).forEach(p=>b.extend(p));map.fitBounds(b,{padding:100,maxZoom:17,duration:500})}
+function fitAll(){if(!segments.length){status('No routes to fit.','Map:');return}const b=new maplibregl.LngLatBounds();segments.forEach(s=>routeCoords(s).forEach(p=>b.extend(p)));map.fitBounds(b,{padding:70,maxZoom:15,duration:500})}
+const OSRM_BASE='https://router.project-osrm.org';
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function pointSegDistanceMeters(p,a,b){const lat=((a[1]+b[1]+p[1])/3)*Math.PI/180,kx=111320*Math.cos(lat),ky=110540;const ax=a[0]*kx,ay=a[1]*ky,bx=b[0]*kx,by=b[1]*ky,px=p[0]*kx,py=p[1]*ky,dx=bx-ax,dy=by-ay;if(dx===0&&dy===0)return Math.hypot(px-ax,py-ay);const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));return Math.hypot(px-(ax+t*dx),py-(ay+t*dy))}
+function simplifyPath(points,tolerance=8){if(points.length<=2)return points.slice();const keep=new Uint8Array(points.length);keep[0]=keep[points.length-1]=1;const stack=[[0,points.length-1]];while(stack.length){const [a,b]=stack.pop();let max=0,idx=-1;for(let i=a+1;i<b;i++){const d=pointSegDistanceMeters(points[i],points[a],points[b]);if(d>max){max=d;idx=i}}if(max>tolerance&&idx>0){keep[idx]=1;stack.push([a,idx],[idx,b])}}return points.filter((_,i)=>keep[i])}
+async function snapSegmentToRoad(s,quiet=false){const url=`${OSRM_BASE}/route/v1/driving/${s.start_lon},${s.start_lat};${s.end_lon},${s.end_lat}?overview=full&geometries=geojson&steps=false`;if(!quiet)status(`Routing ${s.name} along roads…`,'Road snap:');const res=await fetch(url);if(!res.ok)throw new Error(`Routing service returned ${res.status}`);const data=await res.json();if(data.code!=='Ok'||!data.routes?.[0]?.geometry?.coordinates?.length)throw new Error(data.message||'No drivable route found');const raw=data.routes[0].geometry.coordinates.map(p=>[Number(p[0]),Number(p[1])]);const path=simplifyPath(raw,8);if(path.length<2)throw new Error('Route geometry was empty');s.path=path;s.start_lon=path[0][0];s.start_lat=path[0][1];s.end_lon=path[path.length-1][0];s.end_lat=path[path.length-1][1];save();renderAll();return path.length}
+async function snapSelected(){const s=selected();if(!s)return;try{const n=await snapSegmentToRoad(s);status(`${s.name} now follows the road (${n} shape points).`,'Snapped.')}catch(e){status(`${e.message}. Straight line kept.`,'Snap failed:')}}
+async function snapAll(){if(!segments.length)return;let ok=0,fail=0;for(let i=0;i<segments.length;i++){status(`Routing ${i+1}/${segments.length}: ${segments[i].name}`,'Snap all:');try{await snapSegmentToRoad(segments[i],true);ok++}catch(e){console.warn(e);fail++}await sleep(120)}renderAll();fitAll();status(`${ok} route${ok===1?'':'s'} snapped${fail?`; ${fail} failed and remain straight`:''}.`,'Done.')}
 map.on('load',()=>{renderMap();if(segments.length)fitAll();status(`Using ${STYLE_NAMES[$('mapSource').value]} basemap.`,'Map:')});
 map.on('style.load',()=>{renderMap()});
-map.on('click','speedbeep-routes-line',e=>{
- if(drawMode||!e.features?.length)return;
- const f=e.features[0];selectSegment(f.properties.id,false);
- new maplibregl.Popup({closeButton:false,offset:10}).setLngLat(e.lngLat).setHTML(`<b>${esc(f.properties.name)}</b><br>${f.properties.limit} km/h`).addTo(map);
-});
-map.on('mouseenter','speedbeep-routes-line',()=>map.getCanvas().style.cursor='pointer');
-map.on('mouseleave','speedbeep-routes-line',()=>map.getCanvas().style.cursor='');
-
-map.on('click',e=>{
- if(!drawMode)return;
- if(!firstPoint){
-  firstPoint=e.lngLat;
-  tempMarker=new maplibregl.Marker({color:'#e6b800'}).setLngLat(firstPoint).addTo(map);
-  status('Now click the END point.','Drawing:');return;
- }
- const s=normalize({name:`Road segment ${segments.length+1}`,start_lat:firstPoint.lat,start_lon:firstPoint.lng,end_lat:e.lngLat.lat,end_lon:e.lngLat.lng,...DEFAULTS});
- segments.push(s);selectedId=s.id;drawMode=false;firstPoint=null;if(tempMarker){tempMarker.remove();tempMarker=null}save();renderAll();status('Segment created. Name it and enter the verified limit.','Created.');
-});
-
+map.on('click','speedbeep-routes-line',e=>{if(drawMode||!e.features?.length)return;const f=e.features[0];selectSegment(f.properties.id,false);new maplibregl.Popup({closeButton:false,offset:10}).setLngLat(e.lngLat).setHTML(`<b>${esc(f.properties.name)}</b><br>${f.properties.limit} km/h`).addTo(map)});
+map.on('mouseenter','speedbeep-routes-line',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','speedbeep-routes-line',()=>map.getCanvas().style.cursor='');
+map.on('click',e=>{if(!drawMode)return;if(!firstPoint){firstPoint=e.lngLat;tempMarker=new maplibregl.Marker({color:'#e6b800'}).setLngLat(firstPoint).addTo(map);status('Now click the END point.','Drawing:');return}const s=normalize({name:`Road segment ${segments.length+1}`,start_lat:firstPoint.lat,start_lon:firstPoint.lng,end_lat:e.lngLat.lat,end_lon:e.lngLat.lng,...DEFAULTS});segments.push(s);selectedId=s.id;drawMode=false;firstPoint=null;if(tempMarker){tempMarker.remove();tempMarker=null}save();renderAll();status('Segment created. Finding the road route…','Created.');snapSegmentToRoad(s).then(n=>status(`Route created along roads (${n} shape points). Set the verified speed limit.`,'Snapped.')).catch(err=>status(`${err.message}. You can use “Snap selected to road” to retry.`,'Snap failed:'))});
 $('addBtn').onclick=()=>{drawMode=true;selectedId=null;if(startMarker){startMarker.remove();startMarker=null}if(endMarker){endMarker.remove();endMarker=null}if(tempMarker){tempMarker.remove();tempMarker=null}firstPoint=null;renderUI();renderMap();status('Click the START point, then click the END point.','Drawing:')};
-$('fitBtn').onclick=fitAll;
-$('zoomBtn').onclick=zoomSelected;
-$('reloadMapBtn').onclick=()=>changeStyle($('mapSource').value);
-$('mapSource').onchange=()=>changeStyle($('mapSource').value);
-function changeStyle(key){if(!STYLES[key])key='liberty';localStorage.setItem(MAP_SOURCE_KEY,key);map.setStyle(STYLES[key]);status(`Loading ${STYLE_NAMES[key]}…`,'Map:')}
-
-for(const id of ['name','limit','corridor','margin'])$(id).addEventListener('input',()=>{
- const s=selected();if(!s)return;
- s.name=$('name').value.trim()||'Unnamed road';s.limit_kph=Number($('limit').value)||DEFAULTS.limit_kph;s.corridor_m=Number($('corridor').value)||DEFAULTS.corridor_m;s.margin_kph=Math.max(0,Number($('margin').value)||0);save();renderAll();
-});
+$('fitBtn').onclick=fitAll;$('snapBtn').onclick=snapSelected;$('snapAllBtn').onclick=snapAll;$('zoomBtn').onclick=zoomSelected;
+$('reloadMapBtn').onclick=()=>changeStyle($('mapSource').value);$('mapSource').onchange=()=>changeStyle($('mapSource').value);function changeStyle(key){if(!STYLES[key])key='liberty';localStorage.setItem(MAP_SOURCE_KEY,key);map.setStyle(STYLES[key]);status(`Loading ${STYLE_NAMES[key]}…`,'Map:')}
+for(const id of ['name','limit','corridor','margin'])$(id).addEventListener('input',()=>{const s=selected();if(!s)return;s.name=$('name').value.trim()||'Unnamed road';s.limit_kph=Number($('limit').value)||DEFAULTS.limit_kph;s.corridor_m=Number($('corridor').value)||DEFAULTS.corridor_m;s.margin_kph=Math.max(0,Number($('margin').value)||0);save();renderAll()});
 $('deleteBtn').onclick=()=>{const s=selected();if(!s)return;if(!confirm(`Delete “${s.name}”?`))return;segments=segments.filter(x=>x.id!==s.id);selectedId=null;save();renderAll();status('Segment deleted.','Done.')};
 $('duplicateBtn').onclick=()=>{const s=selected();if(!s)return;const c=normalize({...s,id:undefined,name:s.name+' copy'});segments.push(c);selectedId=c.id;save();renderAll();zoomSelected();status('Duplicate created. Drag its endpoints to the next stretch.','Done.')};
-$('locateBtn').onclick=()=>{
- if(!navigator.geolocation){status('Geolocation is unavailable in this browser.','Error:');return}
- status('Requesting your current position…');
- navigator.geolocation.getCurrentPosition(p=>{map.flyTo({center:[p.coords.longitude,p.coords.latitude],zoom:16});status(`Accuracy about ${Math.round(p.coords.accuracy)} m.`,'Located.')},e=>status(e.message,'Location error:'),{enableHighAccuracy:true,timeout:10000});
-};
-
-function parseCsvLine(line){
- const out=[];let cur='',q=false;
- for(let i=0;i<line.length;i++){const c=line[i];if(q){if(c==='"'&&line[i+1]==='"'){cur+='"';i++}else if(c==='"')q=false;else cur+=c}else{if(c==='"')q=true;else if(c===','){out.push(cur);cur=''}else cur+=c}}
- out.push(cur);return out;
-}
-function importCsv(text){
- const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));if(!lines.length)throw new Error('CSV is empty');
- const headers=parseCsvLine(lines[0]).map(x=>x.trim()),required=['name','start_lat','start_lon','end_lat','end_lon','limit_kph','corridor_m','margin_kph'];
- for(const h of required)if(!headers.includes(h))throw new Error(`Missing column: ${h}`);
- const imported=[];for(let i=1;i<lines.length;i++){const vals=parseCsvLine(lines[i]),row={};headers.forEach((h,j)=>row[h]=vals[j]??'');imported.push(normalize(row))}
- segments=imported;selectedId=null;save();renderAll();fitAll();status(`${segments.length} segment${segments.length===1?'':'s'} loaded and shown on the map.`,'Imported.');
-}
+$('locateBtn').onclick=()=>{if(!navigator.geolocation){status('Geolocation is unavailable in this browser.','Error:');return}status('Requesting your current position…');navigator.geolocation.getCurrentPosition(p=>{map.flyTo({center:[p.coords.longitude,p.coords.latitude],zoom:16});status(`Accuracy about ${Math.round(p.coords.accuracy)} m.`,'Located.')},e=>status(e.message,'Location error:'),{enableHighAccuracy:true,timeout:10000})};
+function parseCsvLine(line){const out=[];let cur='',q=false;for(let i=0;i<line.length;i++){const c=line[i];if(q){if(c==='"'&&line[i+1]==='"'){cur+='"';i++}else if(c==='"')q=false;else cur+=c}else{if(c==='"')q=true;else if(c===','){out.push(cur);cur=''}else cur+=c}}out.push(cur);return out}
+function importCsv(text){const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));if(!lines.length)throw new Error('CSV is empty');const headers=parseCsvLine(lines[0]).map(x=>x.trim()),required=['name','start_lat','start_lon','end_lat','end_lon','limit_kph','corridor_m','margin_kph'];for(const h of required)if(!headers.includes(h))throw new Error(`Missing column: ${h}`);const imported=[];for(let i=1;i<lines.length;i++){const vals=parseCsvLine(lines[i]),row={};headers.forEach((h,j)=>row[h]=vals[j]??'');imported.push(normalize(row))}segments=imported;selectedId=null;save();renderAll();fitAll();status(`${segments.length} segment${segments.length===1?'':'s'} loaded and shown on the map.`,'Imported.')}
 $('csvFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{importCsv(await f.text())}catch(err){status(err.message,'Import failed:')}e.target.value=''});
-
 function csvEscape(v){const s=String(v??'');return /[",\n\r]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
 function exportCsv(){
  const header='name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph';
- const rows=segments.map(s=>[s.name,s.start_lat.toFixed(6),s.start_lon.toFixed(6),s.end_lat.toFixed(6),s.end_lon.toFixed(6),Math.round(s.limit_kph),Math.round(s.corridor_m),Math.round(s.margin_kph)].map(csvEscape).join(','));
- return ['# SpeedBeep local road database','# One row = one straight road segment. Use several rows for a curved road.','# corridor_m is the matching width around the segment.','# margin_kph is how far above the legal limit before the warning starts.',header,...rows,''].join('\n');
+ const rows=[];for(const s of segments){const pts=routeCoords(s);for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];rows.push([s.name,a[1].toFixed(6),a[0].toFixed(6),b[1].toFixed(6),b[0].toFixed(6),Math.round(s.limit_kph),Math.round(s.corridor_m),Math.round(s.margin_kph)].map(csvEscape).join(','))}}
+ return ['# SpeedBeep local road database','# Road-snapped routes are exported as many short straight segments for the offline Android matcher.','# corridor_m is the matching width around each segment.','# margin_kph is how far above the legal limit before the warning starts.',header,...rows,''].join('\n');
 }
-$('exportBtn').onclick=()=>{const blob=new Blob([exportCsv()],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='speed_limits.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status(`${segments.length} segment${segments.length===1?'':'s'} written to speed_limits.csv.`,'Exported.')};
+$('exportBtn').onclick=()=>{
+ const unsnapped=segments.filter(s=>!Array.isArray(s.path)||s.path.length<2).length;
+ if(unsnapped&&!confirm(`${unsnapped} route${unsnapped===1?' is':'s are'} still straight rather than road-snapped. Export anyway?`))return;
+ const csv=exportCsv(),blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='speed_limits.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ const rows=Math.max(0,csv.split(/\r?\n/).filter(x=>x&&!x.startsWith('#')).length-1);status(`${segments.length} logical route${segments.length===1?'':'s'} exported as ${rows} road-following segment${rows===1?'':'s'}.`,'Exported.');
+};
 
 loadLocal();
 </script>
