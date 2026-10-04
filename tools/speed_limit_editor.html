@@ -63,8 +63,9 @@
       <div>
         <label for="mapSource">Map source</label>
         <select id="mapSource">
-          <option value="carto">CARTO Voyager</option>
+          <option value="osm">OpenStreetMap Standard</option>
           <option value="esri">Esri World Street Map</option>
+          <option value="topo">OpenTopoMap</option>
         </select>
       </div>
       <div style="display:flex;align-items:end">
@@ -103,7 +104,7 @@
       2. Click the start and end of one reasonably straight stretch of road.<br>
       3. Set its verified speed limit. Use several segments for curves or limit changes.<br>
       4. Export CSV and import it into SpeedBeep.<br><br>
-      Your work is also autosaved in this browser's local storage. The editor is local; the basemap needs internet access. Default tiles come from CARTO (OpenStreetMap data), with Esri available as a backup source.
+      Your work is autosaved in this browser's local storage. The editor is local; the basemap needs internet access. OpenStreetMap Standard is the default, with Esri and OpenTopoMap as fallbacks.
     </div>
   </aside>
 
@@ -114,6 +115,7 @@
     'use strict';
 
     const STORAGE_KEY = 'speedbeep_segments_v1';
+    const MAP_SOURCE_KEY = 'speedbeep_map_source';
     const DEFAULTS = { limit_kph: 60, corridor_m: 40, margin_kph: 3 };
     let segments = [];
     let selectedId = null;
@@ -121,41 +123,67 @@
     let firstPoint = null;
     let tempMarker = null;
     let nextId = 1;
+    let tileErrors = 0;
 
     const $ = id => document.getElementById(id);
     const map = L.map('map').setView([13.02, 80.22], 11);
 
     const baseLayers = {
-      carto: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd',
-        maxZoom: 20,
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
       }),
       esri: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 20,
         attribution: 'Tiles &copy; Esri'
+      }),
+      topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        subdomains: 'abc',
+        maxZoom: 17,
+        attribution: 'Map data &copy; OpenStreetMap contributors, SRTM | Map style &copy; OpenTopoMap'
       })
     };
+
+    const sourceLabels = {
+      osm: 'OpenStreetMap Standard',
+      esri: 'Esri World Street Map',
+      topo: 'OpenTopoMap'
+    };
+
     let activeBaseLayer = null;
-
-    function setBaseLayer(key) {
-      if (!baseLayers[key]) key = 'carto';
-      if (activeBaseLayer) map.removeLayer(activeBaseLayer);
-      activeBaseLayer = baseLayers[key];
-      activeBaseLayer.addTo(map);
-      $('mapSource').value = key;
-      localStorage.setItem('speedbeep_map_source', key);
-      setStatus(`Using ${key === 'carto' ? 'CARTO Voyager' : 'Esri World Street Map'} basemap.`, 'Map:');
-    }
-
-    setBaseLayer(localStorage.getItem('speedbeep_map_source') || 'carto');
-
-    const lineLayer = L.layerGroup().addTo(map);
-    const editLayer = L.layerGroup().addTo(map);
 
     function setStatus(text, strong='') {
       $('status').innerHTML = strong ? `<strong>${escapeHtml(strong)}</strong> ${escapeHtml(text)}` : escapeHtml(text);
     }
+
+    function attachTileDiagnostics(layer, key) {
+      layer.off('tileerror');
+      layer.on('tileerror', () => {
+        tileErrors += 1;
+        if (tileErrors === 3) {
+          setStatus(`${sourceLabels[key]} is having trouble loading tiles. Try another Map source and click Reload map.`, 'Map warning:');
+        }
+      });
+    }
+
+    function setBaseLayer(key) {
+      if (!baseLayers[key]) key = 'osm';
+      if (activeBaseLayer) map.removeLayer(activeBaseLayer);
+      tileErrors = 0;
+      activeBaseLayer = baseLayers[key];
+      attachTileDiagnostics(activeBaseLayer, key);
+      activeBaseLayer.addTo(map);
+      $('mapSource').value = key;
+      localStorage.setItem(MAP_SOURCE_KEY, key);
+      setStatus(`Using ${sourceLabels[key]} basemap.`, 'Map:');
+      setTimeout(() => map.invalidateSize(), 100);
+    }
+
+    const savedMapSource = localStorage.getItem(MAP_SOURCE_KEY);
+    setBaseLayer(baseLayers[savedMapSource] ? savedMapSource : 'osm');
+
+    const lineLayer = L.layerGroup().addTo(map);
+    const editLayer = L.layerGroup().addTo(map);
 
     function escapeHtml(s) {
       return String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -281,11 +309,7 @@
     }
 
     $('mapSource').onchange = () => setBaseLayer($('mapSource').value);
-    $('reloadMapBtn').onclick = () => {
-      const key = $('mapSource').value;
-      setBaseLayer(key);
-      setTimeout(() => map.invalidateSize(), 100);
-    };
+    $('reloadMapBtn').onclick = () => setBaseLayer($('mapSource').value);
 
     $('addBtn').onclick = () => {
       drawMode = true;
@@ -303,9 +327,8 @@
         setStatus('Now click the END point.', 'Drawing:');
         return;
       }
-      const name = `Road segment ${segments.length + 1}`;
       const s = normalizeSegment({
-        name,
+        name: `Road segment ${segments.length + 1}`,
         start_lat:firstPoint.lat, start_lon:firstPoint.lng,
         end_lat:e.latlng.lat, end_lon:e.latlng.lng,
         ...DEFAULTS
@@ -327,13 +350,7 @@
         s.corridor_m = Number($('corridor').value) || DEFAULTS.corridor_m;
         s.margin_kph = Math.max(0, Number($('margin').value) || 0);
         saveLocal();
-        lineLayer.clearLayers();
-        for (const seg of segments) {
-          const line = L.polyline([[seg.start_lat,seg.start_lon],[seg.end_lat,seg.end_lon]], {weight:seg.id===selectedId?8:5, opacity:seg.id===selectedId?0.95:0.72}).addTo(lineLayer);
-          line.bindTooltip(`${escapeHtml(seg.name)} · ${seg.limit_kph} km/h`, {sticky:true});
-          line.on('click', ev => { L.DomEvent.stopPropagation(ev); selectSegment(seg.id); });
-        }
-        renderList();
+        renderAll();
       });
     }
 
