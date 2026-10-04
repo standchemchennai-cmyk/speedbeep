@@ -12,6 +12,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Refresh explicit OSM speed limits
+        run: python tools/import_osm_speed_limits.py
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -33,6 +41,12 @@ jobs:
 
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+
+      - name: Upload generated speed database
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeedBeep-speed-database
+          path: app/src/main/assets/speed_limits.csv
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
