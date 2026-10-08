@@ -136,11 +136,11 @@ out tags geom;'''
     for endpoint in OVERPASS_ENDPOINTS:
         try:
             req = urllib.request.Request(endpoint, data=encoded, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=180) as resp:
+            with urllib.request.urlopen(req, timeout=35) as resp:
                 return json.load(resp)
         except Exception as exc:
             errors.append(f"{endpoint}: {exc}")
-            time.sleep(2)
+            time.sleep(1)
     raise RuntimeError("All Overpass endpoints failed:\n" + "\n".join(errors))
 
 
@@ -225,7 +225,17 @@ def main() -> int:
             print(f"Skipping malformed manual row: {row}", file=sys.stderr)
 
     print(f"Preserving {len(manual_rows)} manual CSV segments")
-    data = fetch_overpass()
+    try:
+        data = fetch_overpass()
+    except RuntimeError as exc:
+        # The checked-in database is the reliable baseline. Network refresh is
+        # optional and must never prevent an otherwise valid Android APK build.
+        if not ASSET_CSV.is_file() or not manual_rows:
+            raise RuntimeError("OSM refresh failed and no valid bundled fallback is available") from exc
+        print("OSM refresh unavailable; keeping the checked-in offline road database.", file=sys.stderr)
+        print(f"Reason: {exc}", file=sys.stderr)
+        return 0
+
     osm_rows, stats = build_osm_rows(data, manual_segments)
     write_csv(ROOT_CSV, manual_rows, osm_rows)
     write_csv(ASSET_CSV, manual_rows, osm_rows)

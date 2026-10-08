@@ -82,7 +82,9 @@ MIT
 
 ## GitHub one-click APK build
 
-A GitHub Actions workflow is included at `.github/workflows/build-apk.yml`. If you push this folder to GitHub, the workflow installs SDK 36, builds the debug APK, and uploads `SpeedBeep-debug-apk` as a workflow artifact.
+The workflow at `.github/workflows/build-apk.yml` builds an installable Android debug APK on each push to `main` and through **Actions → Build Android APK → Run workflow**. A successful run contains a `SpeedBeep-debug-apk` artifact; download its ZIP, extract `app-debug.apk`, and install that APK on an Android phone.
+
+By default, builds use the committed offline Chennai speed-limit database; an OpenStreetMap server outage cannot block APK creation. To request new OSM limits during a manual build, enable the optional `refresh_osm` input. If OSM endpoints are unavailable, the importer keeps the existing bundled road data and proceeds with the build. GitHub Actions only retains APK artifacts for 30 days.
 
 ## Local map editor
 
