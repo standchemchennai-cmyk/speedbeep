@@ -33,6 +33,8 @@ public final class MainActivity extends Activity {
     private static final int REQ_EXPORT = 201;
     private static final int REQ_LOG_EXPORT = 202;
 
+    private TripMapView tripMap;
+    private long lastMapReload = 0;
     private TextView bigSpeed;
     private TextView roadText;
     private TextView limitText;
@@ -95,6 +97,11 @@ public final class MainActivity extends Activity {
         root.addView(roadText);
         root.addView(limitText);
         root.addView(detailText);
+
+        tripMap = new TripMapView(this);
+        root.addView(tripMap, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(380)));
+        TextView mapHelp = label("Map: tap lower to zoom in, upper to zoom out. GPS trip is saved locally. Review while parked.", 13, false);
+        root.addView(mapHelp);
 
         LinearLayout buttons = new LinearLayout(this);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
@@ -246,6 +253,7 @@ public final class MainActivity extends Activity {
     private void refreshCsvInfo() {
         try {
             List<RoadSegment> roads = LocalRoadStore.load(this);
+            tripMap.setRoads(roads);
             csvText.setText("CSV: " + roads.size() + " road segment" + (roads.size() == 1 ? "" : "s") + " loaded");
         } catch (IOException ex) {
             csvText.setText("CSV ERROR: " + ex.getMessage());
@@ -267,6 +275,13 @@ public final class MainActivity extends Activity {
             note = "WARNING: no GPS updates for over 15 seconds";
         }
 
+        float latitude = p.getFloat("latitude", Float.NaN);
+        float longitude = p.getFloat("longitude", Float.NaN);
+        if (!Float.isNaN(latitude) && !Float.isNaN(longitude)) tripMap.setPosition(latitude, longitude);
+        if (System.currentTimeMillis() - lastMapReload > 5000) {
+            lastMapReload = System.currentTimeMillis();
+            tripMap.reloadTrip();
+        }
         bigSpeed.setText(running ? String.format(Locale.US, "%.0f", speed) : "—");
         roadText.setText(road == null || road.isEmpty() ? "Road: —" : "Road: " + road);
         limitText.setText(limit > 0 ? String.format(Locale.US, "Limit: %.0f km/h  (+%.0f)", limit, margin) : "Limit: —");
