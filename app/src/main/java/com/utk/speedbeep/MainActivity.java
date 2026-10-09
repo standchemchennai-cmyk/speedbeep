@@ -37,7 +37,7 @@ public final class MainActivity extends Activity {
     private static final int REQ_EXPORT = 201;
     private static final int REQ_LOG_EXPORT = 202;
 
-    private TripMapView tripMap;
+    private OSMTripMap tripMap;
     private long lastMapReload = 0;
     private TextView bigSpeed;
     private TextView roadText;
@@ -102,13 +102,13 @@ public final class MainActivity extends Activity {
         root.addView(limitText);
         root.addView(detailText);
 
-        tripMap = new TripMapView(this);
+        tripMap = new OSMTripMap(this);
         root.addView(tripMap, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(380)));
         Button fitMap = new Button(this);
         fitMap.setText("FIT ALL CONFIGURED ROADS");
-        fitMap.setOnClickListener(v -> tripMap.resetView());
+        fitMap.setOnClickListener(v -> tripMap.fitRoads());
         root.addView(fitMap);
-        TextView mapHelp = label("Pinch to zoom; drag to pan. This is an offline diagram, not a street basemap. Review while parked.", 13, false);
+        TextView mapHelp = label("OpenStreetMap: pinch to zoom and drag to pan. Tiles need internet on first view; cached tiles may work offline. Review while parked.", 13, false);
         root.addView(mapHelp);
 
         LinearLayout buttons = new LinearLayout(this);
@@ -399,6 +399,6 @@ public final class MainActivity extends Activity {
 
     private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_LONG).show(); }
 
-    @Override protected void onResume() { super.onResume(); handler.post(refreshRunnable); }
-    @Override protected void onPause() { handler.removeCallbacks(refreshRunnable); super.onPause(); }
+    @Override protected void onResume() { super.onResume(); tripMap.onResume(); handler.post(refreshRunnable); }
+    @Override protected void onPause() { handler.removeCallbacks(refreshRunnable); tripMap.onPause(); super.onPause(); }
 }
