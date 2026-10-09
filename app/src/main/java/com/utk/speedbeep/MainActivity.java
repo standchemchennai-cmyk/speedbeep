@@ -31,6 +31,7 @@ public final class MainActivity extends Activity {
     private static final int REQ_NOTIFICATIONS = 101;
     private static final int REQ_IMPORT = 200;
     private static final int REQ_EXPORT = 201;
+    private static final int REQ_LOG_EXPORT = 202;
 
     private TextView bigSpeed;
     private TextView roadText;
@@ -121,6 +122,17 @@ public final class MainActivity extends Activity {
         exportButton.setOnClickListener(v -> exportCsv());
         root.addView(exportButton, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
 
+        Button exportLog = new Button(this);
+        exportLog.setText("EXPORT DRIVE DIAGNOSTICS");
+        exportLog.setOnClickListener(v -> {
+            Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("text/csv");
+            i.putExtra(Intent.EXTRA_TITLE, "drive_diagnostics.csv");
+            startActivityForResult(i, REQ_LOG_EXPORT);
+        });
+        root.addView(exportLog);
+
         TextView help = label("CSV columns:\nname,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph\n\nUse several short rows for curved roads. V1 warns only on roads in your CSV. Tap Start after getting into the car; monitoring continues with the screen off.", 14, false);
         help.setPadding(0, dp(18), 0, dp(12));
         root.addView(help);
@@ -195,6 +207,15 @@ public final class MainActivity extends Activity {
             } catch (Exception ex) {
                 toast("Import failed: " + ex.getMessage());
             }
+        } else if (requestCode == REQ_LOG_EXPORT) {
+            try (InputStream in = new java.io.FileInputStream(DriveLog.file(this));
+                 OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null) throw new IOException("Could not open export destination");
+                byte[] buffer = new byte[8192];
+                int n;
+                while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+                toast("Drive diagnostics exported");
+            } catch (Exception ex) { toast("Export failed: " + ex.getMessage()); }
         } else if (requestCode == REQ_EXPORT) {
             try {
                 LocalRoadStore.ensureSeedFile(this);
@@ -241,6 +262,10 @@ public final class MainActivity extends Activity {
         float distance = p.getFloat("distanceM", 0f);
         float accuracy = p.getFloat("accuracyM", 0f);
         String note = p.getString("note", running ? "Monitoring" : "Stopped");
+        long lastUpdate = p.getLong("updatedAt", 0L);
+        if (running && lastUpdate > 0 && System.currentTimeMillis() - lastUpdate > 15000L) {
+            note = "WARNING: no GPS updates for over 15 seconds";
+        }
 
         bigSpeed.setText(running ? String.format(Locale.US, "%.0f", speed) : "—");
         roadText.setText(road == null || road.isEmpty() ? "Road: —" : "Road: " + road);
