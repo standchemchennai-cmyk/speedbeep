@@ -32,6 +32,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
     public static final String ACTION_STOP = "com.utk.speedbeep.STOP";
     public static final String PREFS = "speedbeep_status";
 
+    public static final String SETTINGS = "speedbeep_settings";
     private static final int NOTIFICATION_ID = 3141;
     private static final String CHANNEL_ID = "speed_monitor";
     private static final long LOCATION_INTERVAL_MS = 1000L;
@@ -134,6 +135,28 @@ public final class SpeedMonitorService extends Service implements LocationListen
         }
 
         if (road == null) {
+            SharedPreferences settings = getSharedPreferences(SETTINGS, MODE_PRIVATE);
+            boolean fallback = settings.getBoolean("fallback_enabled", false);
+            float defaultLimit = settings.getFloat("fallback_kph", 40f);
+            float defaultMargin = settings.getFloat("fallback_margin", 3f);
+            if (fallback) {
+                long now = SystemClock.elapsedRealtime();
+                if (speedKph > defaultLimit + defaultMargin) {
+                    if (overLimitSinceMs == 0) overLimitSinceMs = now;
+                    if (now - overLimitSinceMs >= OVER_LIMIT_HOLD_MS && now - lastBeepMs >= BEEP_REPEAT_MS) {
+                        beep(); lastBeepMs = now;
+                    }
+                } else resetOverspeed();
+                RoadSegment virtual = new RoadSegment("Unmapped road (user default)",
+                        location.getLatitude(), location.getLongitude(),
+                        location.getLatitude(), location.getLongitude(),
+                        defaultLimit, 40, defaultMargin);
+                logSample(location, speedKph, accuracy, "FALLBACK", virtual, 0);
+                writeStatus(true, speedKph, virtual, 0, accuracy, "User fallback limit, not verified legal limit");
+                maybeUpdateNotification(speedKph, virtual, "User fallback");
+                return;
+            }
+            resetOverspeed();
             logSample(location, speedKph, accuracy, "NO_ROAD", null, 0);
             writeStatus(true, speedKph, null, 0, accuracy, "No configured road here");
             maybeUpdateNotification(speedKph, null, "No configured road");
