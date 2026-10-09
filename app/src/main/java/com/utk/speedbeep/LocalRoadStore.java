@@ -68,11 +68,11 @@ public final class LocalRoadStore {
         File tmp = new File(context.getFilesDir(), FILE_NAME + ".editing");
         try (java.io.OutputStreamWriter out = new java.io.OutputStreamWriter(
                 new FileOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8)) {
-            out.write("name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph\\n");
+            out.write("name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph\n");
             for (RoadSegment r : roads) {
-                String name = r.name.replace("\\"", "\\"\\"");
+                String name = r.name.replace("\"", "\"\"");
                 out.write(String.format(java.util.Locale.US,
-                        "\\"%s\\",%.7f,%.7f,%.7f,%.7f,%.1f,%.1f,%.1f\\n",
+                        "\"%s\",%.7f,%.7f,%.7f,%.7f,%.1f,%.1f,%.1f\n",
                         name,r.startLat,r.startLon,r.endLat,r.endLon,r.limitKph,r.corridorM,r.marginKph));
             }
         }
