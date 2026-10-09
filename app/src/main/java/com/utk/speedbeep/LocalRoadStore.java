@@ -63,6 +63,24 @@ public final class LocalRoadStore {
         return parsed.size();
     }
 
+    public static void save(Context context, List<RoadSegment> roads) throws IOException {
+        if (roads.isEmpty()) throw new IOException("Cannot save empty road database");
+        File tmp = new File(context.getFilesDir(), FILE_NAME + ".editing");
+        try (java.io.OutputStreamWriter out = new java.io.OutputStreamWriter(
+                new FileOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8)) {
+            out.write("name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph\\n");
+            for (RoadSegment r : roads) {
+                String name = r.name.replace("\\"", "\\"\\"");
+                out.write(String.format(java.util.Locale.US,
+                        "\\"%s\\",%.7f,%.7f,%.7f,%.7f,%.1f,%.1f,%.1f\\n",
+                        name,r.startLat,r.startLon,r.endLat,r.endLon,r.limitKph,r.corridorM,r.marginKph));
+            }
+        }
+        try (FileInputStream check = new FileInputStream(tmp)) { CsvRoadRepository.read(check); }
+        try (FileInputStream in = new FileInputStream(tmp)) { importCsv(context, in); }
+        tmp.delete();
+    }
+
     private static void copy(InputStream in, FileOutputStream out) throws IOException {
         byte[] buffer = new byte[8192];
         int n;
