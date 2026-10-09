@@ -59,7 +59,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
             startForeground(NOTIFICATION_ID, starting);
         }
 
-        toneGenerator = new ToneGenerator(AudioManager.STREAM_ALARM, 100);
+        toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         try {
@@ -77,9 +77,9 @@ public final class SpeedMonitorService extends Service implements LocationListen
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
             stopSelf();
-            return START_NOT_STICKY;
+            return START_STICKY;
         }
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     private void startLocationUpdates() {
