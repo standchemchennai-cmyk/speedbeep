@@ -2,6 +2,10 @@ package com.utk.speedbeep;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.widget.EditText;
+import android.widget.CheckBox;
+import java.util.ArrayList;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -115,6 +119,16 @@ public final class MainActivity extends Activity {
         startButton.setOnClickListener(v -> startMonitoring());
         stopButton.setOnClickListener(v -> stopMonitoring());
 
+        Button fallbackButton = new Button(this);
+        fallbackButton.setText("UNMAPPED ROAD SPEED SETTINGS");
+        fallbackButton.setOnClickListener(v -> showFallbackSettings());
+        root.addView(fallbackButton);
+
+        Button editButton = new Button(this);
+        editButton.setText("EDIT CONFIGURED ROAD LIMITS");
+        editButton.setOnClickListener(v -> chooseRoadToEdit());
+        root.addView(editButton);
+
         csvText = label("CSV: checking…", 14, false);
         csvText.setPadding(0, dp(22), 0, dp(8));
         root.addView(csvText);
@@ -183,6 +197,89 @@ public final class MainActivity extends Activity {
         Intent i = new Intent(this, SpeedMonitorService.class).setAction(SpeedMonitorService.ACTION_STOP);
         startService(i);
         refreshStatus();
+    }
+
+    private boolean editingAllowed() {
+        if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE).getBoolean("running", false)) {
+            toast("Stop monitoring and park before editing roads");
+            return false;
+        }
+        return true;
+    }
+
+    private void showFallbackSettings() {
+        if (!editingAllowed()) return;
+        SharedPreferences p = getSharedPreferences(SpeedMonitorService.SETTINGS, MODE_PRIVATE);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(20), dp(8), dp(20), dp(8));
+        CheckBox enabled = new CheckBox(this);
+        enabled.setText("Warn on roads without a configured limit");
+        enabled.setChecked(p.getBoolean("fallback_enabled", false));
+        layout.addView(enabled);
+        EditText limit = new EditText(this);
+        limit.setInputType(2);
+        limit.setHint("Default km/h");
+        limit.setText(String.valueOf((int)p.getFloat("fallback_kph",40)));
+        layout.addView(limit);
+        EditText margin = new EditText(this);
+        margin.setInputType(2);
+        margin.setHint("Warning margin km/h");
+        margin.setText(String.valueOf((int)p.getFloat("fallback_margin",3)));
+        layout.addView(margin);
+        new AlertDialog.Builder(this).setTitle("User-defined fallback (not a legal speed limit)")
+                .setView(layout).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{
+                    try {
+                        float v=Float.parseFloat(limit.getText().toString());
+                        float m=Float.parseFloat(margin.getText().toString());
+                        if(v<5||v>200||m<0||m>50) throw new NumberFormatException();
+                        p.edit().putBoolean("fallback_enabled",enabled.isChecked())
+                                .putFloat("fallback_kph",v).putFloat("fallback_margin",m).apply();
+                        toast("Fallback saved");
+                    } catch(NumberFormatException ex) { toast("Use limit 5–200 and margin 0–50"); }
+                }).show();
+    }
+
+    private void chooseRoadToEdit() {
+        if (!editingAllowed()) return;
+        try {
+            List<RoadSegment> roads=LocalRoadStore.load(this);
+            String[] labels=new String[roads.size()];
+            for(int i=0;i<roads.size();i++) labels[i]=roads.get(i).name+" — "+(int)roads.get(i).limitKph+" km/h";
+            new AlertDialog.Builder(this).setTitle("Select segment to edit")
+                    .setItems(labels,(d,index)->editRoad(roads,index)).setNegativeButton("Cancel",null).show();
+        } catch(IOException ex) { toast(ex.getMessage()); }
+    }
+
+    private void editRoad(List<RoadSegment> roads,int index) {
+        RoadSegment original=roads.get(index);
+        LinearLayout layout=new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(20),dp(8),dp(20),dp(8));
+        EditText name=new EditText(this);name.setText(original.name);name.setHint("Road name");layout.addView(name);
+        EditText limit=new EditText(this);limit.setInputType(2);
+        limit.setText(String.valueOf((int)original.limitKph));limit.setHint("Limit km/h");layout.addView(limit);
+        new AlertDialog.Builder(this).setTitle("Edit segment")
+                .setMessage("Changes to a single segment. Geometry remains unchanged.")
+                .setView(layout).setNegativeButton("Cancel",null)
+                .setNeutralButton("Delete",(d,w)->{
+                    if(roads.size()<=1){toast("Cannot delete last road");return;}
+                    roads.remove(index);saveEditedRoads(roads);
+                }).setPositiveButton("Save",(d,w)->{
+                    try {
+                        double v=Double.parseDouble(limit.getText().toString());
+                        if(v<5||v>200||name.getText().toString().trim().isEmpty()) throw new NumberFormatException();
+                        roads.set(index,new RoadSegment(name.getText().toString().trim(),
+                                original.startLat,original.startLon,original.endLat,original.endLon,
+                                v,original.corridorM,original.marginKph));
+                        saveEditedRoads(roads);
+                    }catch(NumberFormatException ex){toast("Enter a name and limit 5–200");}
+                }).show();
+    }
+
+    private void saveEditedRoads(List<RoadSegment> roads) {
+        try { LocalRoadStore.save(this,roads);refreshCsvInfo();toast("Road changes saved"); }
+        catch(IOException ex) { toast("Save failed: "+ex.getMessage()); }
     }
 
     private void chooseCsv() {
