@@ -77,7 +77,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
             stopSelf();
-            return START_STICKY;
+            return START_NOT_STICKY;
         }
         return START_STICKY;
     }
