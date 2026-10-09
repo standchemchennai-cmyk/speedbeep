@@ -110,6 +110,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
 
     @Override
     public void onLocationChanged(Location location) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putFloat("latitude", (float) location.getLatitude()).putFloat("longitude", (float) location.getLongitude()).apply();
         double speedKph = getSpeedKph(location);
         float accuracy = location.hasAccuracy() ? location.getAccuracy() : 999f;
 
