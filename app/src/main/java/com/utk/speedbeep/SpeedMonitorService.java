@@ -46,6 +46,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
     private long overLimitSinceMs = 0L;
     private long lastBeepMs = 0L;
     private long lastNotificationUpdateMs = 0L;
+    private long lastLogMs = 0L;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
@@ -113,6 +114,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
         float accuracy = location.hasAccuracy() ? location.getAccuracy() : 999f;
 
         if (accuracy > MAX_ACCURACY_M) {
+            logSample(location, speedKph, accuracy, "WEAK_GPS", null, 0);
             currentRoad = null;
             resetOverspeed();
             String note = String.format(Locale.US, "GPS weak (±%.0f m)", accuracy);
@@ -125,17 +127,19 @@ public final class SpeedMonitorService extends Service implements LocationListen
                 location.getLatitude(), location.getLongitude(), accuracy, roads);
         RoadSegment road = match == null ? null : match.road;
 
-        if (road != currentRoad) {
+        if (road != currentRoad && (road == null || currentRoad == null || road.limitKph != currentRoad.limitKph || road.marginKph != currentRoad.marginKph)) {
             currentRoad = road;
             resetOverspeed();
         }
 
         if (road == null) {
+            logSample(location, speedKph, accuracy, "NO_ROAD", null, 0);
             writeStatus(true, speedKph, null, 0, accuracy, "No configured road here");
             maybeUpdateNotification(speedKph, null, "No configured road");
             return;
         }
 
+        logSample(location, speedKph, accuracy, "MATCHED", road, match.distanceM);
         double threshold = road.limitKph + road.marginKph;
         boolean over = speedKph > threshold;
         long now = SystemClock.elapsedRealtime();
@@ -155,6 +159,14 @@ public final class SpeedMonitorService extends Service implements LocationListen
                 : "Monitoring";
         writeStatus(true, speedKph, road, match.distanceM, accuracy, note);
         maybeUpdateNotification(speedKph, road, note);
+    }
+
+    private void logSample(Location location, double speed, float accuracy, String result, RoadSegment road, double distance) {
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastLogMs < 5000L) return;
+        lastLogMs = now;
+        try { DriveLog.append(this, location, speed, accuracy, result, road, distance); }
+        catch (IOException ignored) { }
     }
 
     private double getSpeedKph(Location location) {
@@ -217,6 +229,8 @@ public final class SpeedMonitorService extends Service implements LocationListen
                 .setSmallIcon(android.R.drawable.ic_menu_mylocation)
                 .setContentIntent(openPi)
                 .setOngoing(true)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .setOnlyAlertOnce(true)
                 .addAction(new Notification.Action.Builder(android.R.drawable.ic_media_pause, "Stop", stopPi).build())
                 .build();
     }
