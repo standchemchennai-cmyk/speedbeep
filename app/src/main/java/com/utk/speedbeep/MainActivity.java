@@ -104,7 +104,11 @@ public final class MainActivity extends Activity {
 
         tripMap = new TripMapView(this);
         root.addView(tripMap, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(380)));
-        TextView mapHelp = label("Map: tap lower to zoom in, upper to zoom out. GPS trip is saved locally. Review while parked.", 13, false);
+        Button fitMap = new Button(this);
+        fitMap.setText("FIT ALL CONFIGURED ROADS");
+        fitMap.setOnClickListener(v -> tripMap.resetView());
+        root.addView(fitMap);
+        TextView mapHelp = label("Pinch to zoom; drag to pan. This is an offline diagram, not a street basemap. Review while parked.", 13, false);
         root.addView(mapHelp);
 
         LinearLayout buttons = new LinearLayout(this);
