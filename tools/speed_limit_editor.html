@@ -34,6 +34,7 @@ input[type=text],input[type=number],select{width:100%;padding:9px 10px;border-ra
 <label class="file-label" for="csvFile">Import CSV</label><input id="csvFile" type="file" accept=".csv,text/csv">
 <button id="exportBtn">Export CSV</button>
 <button id="fitBtn">Fit routes</button>
+<button id="resetBtn">Load bundled routes</button>
 <button id="locateBtn">My location</button>
 </div>
 <div class="row2" style="margin-bottom:12px">
@@ -44,7 +45,7 @@ input[type=text],input[type=number],select{width:100%;padding:9px 10px;border-ra
 </select></div>
 <div style="display:flex;align-items:end"><button id="reloadMapBtn" style="width:100%">Reload map</button></div>
 </div>
-<div id="status" class="status"><strong>Ready.</strong> Import a CSV or draw your first segment.</div>
+<div id="status" class="status"><strong>Ready.</strong> Your bundled Chennai routes will load automatically. You can also import a CSV.</div>
 <div class="section">
 <strong>Segments</strong> <span id="count" class="pill">0</span>
 <div class="legend"><span><i class="swatch route"></i>saved route</span><span><i class="swatch selected-line"></i>selected</span></div>
@@ -62,12 +63,12 @@ input[type=text],input[type=number],select{width:100%;padding:9px 10px;border-ra
 <div class="toolbar"><button id="snapBtn" class="primary">Snap selected to road</button><button id="snapAllBtn">Snap all to roads</button><button id="zoomBtn">Zoom to route</button><button id="duplicateBtn">Duplicate</button><button id="deleteBtn" class="danger">Delete</button></div>
 </div>
 <div class="section help"><strong>How to use</strong><br>
-1. Import your current CSV or click <b>Draw segment</b>.<br>
+1. Your current bundled routes load automatically as <b>13 editable routes</b>. To return to those routes, click <b>Load bundled routes</b>, or import another CSV.<br>
 2. Click the route start and end. New routes are automatically snapped to drivable roads.<br>
 3. For an imported straight route, select it and click <b>Snap selected to road</b>, or use <b>Snap all to roads</b>.<br>
 4. Cyan = saved route, yellow = selected. Dragging an endpoint marks it unsnapped until you snap it again.<br>
 5. Export CSV. Road shapes are converted into many short straight segments so the Android app can match them offline.<br><br>
-Work is autosaved in this browser. The map uses OpenFreeMap vector styles through MapLibre. Road snapping uses the public OSRM routing service and therefore needs internet access while editing.
+Work is autosaved in this browser, not sent to GitHub. <b>Export CSV</b> when finished and send that file back for inclusion in the next APK. Loading bundled routes replaces your current draft after confirmation. The map uses OpenFreeMap vector styles through MapLibre. Road snapping uses the public OSRM routing service and therefore needs internet access while editing.
 </div>
 </aside>
 <div id="map"></div>
@@ -75,6 +76,107 @@ Work is autosaved in this browser. The map uses OpenFreeMap vector styles throug
 <script>
 'use strict';
 const STORAGE_KEY='speedbeep_segments_v1',MAP_SOURCE_KEY='speedbeep_map_source';
+// Snapshot of the repository's committed offline routes at editor creation time.
+const BUNDLED_CSV = `# SpeedBeep local road database
+# Road-snapped routes are exported as many short straight segments for the offline Android matcher.
+# corridor_m is the matching width around each segment.
+# margin_kph is how far above the legal limit before the warning starts.
+name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph
+Road segment 1,13.089205,80.250993,13.085928,80.250458,20,40,3
+Road segment 2,13.092389,80.240908,13.092573,80.240968,35,40,3
+Road segment 2,13.092573,80.240968,13.090407,80.240905,35,40,3
+Road segment 2,13.090407,80.240905,13.089768,80.241038,35,40,3
+Road segment 2,13.089768,80.241038,13.088149,80.242231,35,40,3
+Road segment 2,13.088149,80.242231,13.087864,80.243305,35,40,3
+Road segment 2,13.087864,80.243305,13.087484,80.243901,35,40,3
+Road segment 2,13.087484,80.243901,13.085790,80.245221,35,40,3
+Road segment 2,13.085790,80.245221,13.085583,80.245280,35,40,3
+Road segment 2,13.085583,80.245280,13.085557,80.245167,35,40,3
+Road segment 2,13.085557,80.245167,13.085658,80.245212,35,40,3
+Road segment 3,13.085644,80.252157,13.085694,80.254399,40,40,3
+Road segment 3,13.085694,80.254399,13.085540,80.254679,40,40,3
+Road segment 3,13.085540,80.254679,13.082325,80.254470,40,40,3
+Road segment 3,13.082325,80.254470,13.081476,80.254865,40,40,3
+Road segment 3,13.081476,80.254865,13.079504,80.254587,40,40,3
+Road segment 3,13.079504,80.254587,13.078878,80.254700,40,40,3
+Road segment 3,13.078878,80.254700,13.078739,80.253099,40,40,3
+Road segment 3,13.078739,80.253099,13.078771,80.251695,40,40,3
+Road segment 3,13.078771,80.251695,13.078888,80.251687,40,40,3
+Road segment 3,13.078888,80.251687,13.078879,80.252224,40,40,3
+Road segment 4,13.074494,80.252327,13.073888,80.252545,45,40,3
+Road segment 4,13.073888,80.252545,13.072289,80.252367,45,40,3
+Road segment 4,13.072289,80.252367,13.071279,80.248140,45,40,3
+Road segment 4,13.071279,80.248140,13.069641,80.244274,45,40,3
+Road segment 4,13.069641,80.244274,13.069271,80.243110,45,40,3
+Road segment 4,13.069271,80.243110,13.069216,80.242319,45,40,3
+Road segment 4,13.069216,80.242319,13.069283,80.242362,45,40,3
+Road segment 5,13.064930,80.266605,13.057705,80.257740,40,40,3
+Road segment 5,13.057705,80.257740,13.056362,80.256520,40,40,3
+Road segment 5,13.056362,80.256520,13.052105,80.250753,40,40,3
+Road segment 5,13.052105,80.250753,13.051745,80.250424,40,40,3
+Road segment 5,13.051745,80.250424,13.051102,80.250122,40,40,3
+Road segment 5,13.051102,80.250122,13.048415,80.249633,40,40,3
+Road segment 5,13.048415,80.249633,13.047104,80.248625,40,40,3
+Road segment 5,13.047104,80.248625,13.035309,80.246104,40,40,3
+Road segment 6,13.092579,80.240790,13.092573,80.240968,35,40,3
+Road segment 6,13.092573,80.240968,13.092487,80.240974,35,40,3
+Road segment 6,13.092487,80.240974,13.092999,80.233937,35,40,3
+Road segment 6,13.092999,80.233937,13.092706,80.232147,35,40,3
+Road segment 6,13.092706,80.232147,13.088526,80.231449,35,40,3
+Road segment 6,13.088526,80.231449,13.088605,80.231383,35,40,3
+Road segment 7,13.087682,80.234408,13.087747,80.234503,40,40,3
+Road segment 7,13.087747,80.234503,13.087923,80.234290,40,40,3
+Road segment 7,13.087923,80.234290,13.088194,80.232658,40,40,3
+Road segment 7,13.088194,80.232658,13.088553,80.231377,40,40,3
+Road segment 7,13.088553,80.231377,13.089642,80.229293,40,40,3
+Road segment 7,13.089642,80.229293,13.093587,80.225104,40,40,3
+Road segment 7,13.093587,80.225104,13.094950,80.223264,40,40,3
+Road segment 7,13.094950,80.223264,13.097185,80.217034,40,40,3
+Road segment 7,13.097185,80.217034,13.098327,80.214271,40,40,3
+Road segment 7,13.098327,80.214271,13.102519,80.205056,40,40,3
+Road segment 7,13.102519,80.205056,13.103002,80.204399,40,40,3
+Road segment 7,13.103002,80.204399,13.103580,80.203130,40,40,3
+Road segment 7,13.103580,80.203130,13.102971,80.198212,40,40,3
+Road segment 7,13.102971,80.198212,13.101912,80.194882,40,40,3
+Road segment 7,13.101912,80.194882,13.101509,80.194390,40,40,3
+Road segment 7,13.101509,80.194390,13.101570,80.194029,40,40,3
+Road segment 7,13.101570,80.194029,13.101870,80.193873,40,40,3
+Road segment 7,13.101870,80.193873,13.101870,80.193534,40,40,3
+Road segment 7,13.101870,80.193534,13.101389,80.190742,40,40,3
+Road segment 7,13.101389,80.190742,13.100988,80.189529,40,40,3
+Road segment 7,13.100988,80.189529,13.100485,80.188885,40,40,3
+Road segment 7,13.100485,80.188885,13.100124,80.188122,40,40,3
+Road segment 7,13.100124,80.188122,13.099750,80.186748,40,40,3
+Road segment 8,13.099755,80.186594,13.099815,80.186707,35,40,3
+Road segment 8,13.099815,80.186707,13.098651,80.182741,35,40,3
+Road segment 8,13.098651,80.182741,13.097869,80.179439,35,40,3
+Road segment 8,13.097869,80.179439,13.097813,80.178645,35,40,3
+Road segment 8,13.097813,80.178645,13.098171,80.175032,35,40,3
+Road segment 8,13.098171,80.175032,13.098543,80.173815,35,40,3
+Road segment 8,13.098543,80.173815,13.099413,80.171736,35,40,3
+Road segment 8,13.099413,80.171736,13.099739,80.170173,35,40,3
+Road segment 9,13.108526,80.163098,13.108656,80.161035,30,40,3
+Road segment 9,13.108656,80.161035,13.108626,80.160540,30,40,3
+Road segment 9,13.108626,80.160540,13.108681,80.159154,30,40,3
+Road segment 9,13.108681,80.159154,13.108613,80.157974,30,40,3
+Road segment 9,13.108613,80.157974,13.108370,80.154946,30,40,3
+Road segment 10,13.109909,80.163866,13.109738,80.165843,35,40,3
+Road segment 10,13.109738,80.165843,13.109277,80.166992,35,40,3
+Road segment 10,13.109277,80.166992,13.109471,80.169098,35,40,3
+Road segment 10,13.109471,80.169098,13.107937,80.186325,35,40,3
+Road segment 10,13.107937,80.186325,13.107853,80.186602,35,40,3
+Road segment 10,13.107853,80.186602,13.107559,80.186642,35,40,3
+Road segment 11,13.107515,80.186538,13.107511,80.186637,40,40,3
+Road segment 11,13.107511,80.186637,13.104256,80.186344,40,40,3
+Road segment 11,13.104256,80.186344,13.099902,80.186700,40,40,3
+Road segment 12,13.085595,80.245351,13.085557,80.245167,20,40,3
+Road segment 12,13.085557,80.245167,13.085648,80.245162,20,40,3
+Road segment 12,13.085648,80.245162,13.085869,80.247498,20,40,3
+Road segment 12,13.085869,80.247498,13.085917,80.250387,20,40,3
+Road segment 13,13.073070,80.261209,13.066721,80.260721,35,40,3
+Road segment 13,13.066721,80.260721,13.065290,80.260439,35,40,3
+Road segment 13,13.065290,80.260439,13.064063,80.260056,35,40,3`;
+
 const DEFAULTS={limit_kph:60,corridor_m:40,margin_kph:3};
 const STYLES={liberty:'https://tiles.openfreemap.org/styles/liberty',bright:'https://tiles.openfreemap.org/styles/bright',positron:'https://tiles.openfreemap.org/styles/positron'};
 const STYLE_NAMES={liberty:'OpenFreeMap Liberty',bright:'OpenFreeMap Bright',positron:'OpenFreeMap Positron'};
@@ -94,7 +196,9 @@ function normalize(raw){
 function selected(){return segments.find(s=>s.id===selectedId)||null}
 function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(segments.map(({id,...s})=>s)))}
 function loadLocal(){
- try{const raw=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');if(Array.isArray(raw))segments=raw.map(normalize)}catch(e){console.warn(e)}
+ const existing=localStorage.getItem(STORAGE_KEY);
+ if(existing===null){try{importCsv(BUNDLED_CSV);status('Current app routes loaded. Edit them and export the final CSV when ready.','Loaded:');return}catch(e){console.warn('Bundled routes could not load',e)}}
+ try{const raw=JSON.parse(existing||'[]');if(Array.isArray(raw))segments=raw.map(normalize)}catch(e){console.warn(e)}
  renderUI();
 }
 function routeCoords(s){return Array.isArray(s.path)&&s.path.length>=2?s.path:[[s.start_lon,s.start_lat],[s.end_lon,s.end_lat]]}
@@ -143,14 +247,40 @@ map.on('click','speedbeep-routes-line',e=>{if(drawMode||!e.features?.length)retu
 map.on('mouseenter','speedbeep-routes-line',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','speedbeep-routes-line',()=>map.getCanvas().style.cursor='');
 map.on('click',e=>{if(!drawMode)return;if(!firstPoint){firstPoint=e.lngLat;tempMarker=new maplibregl.Marker({color:'#e6b800'}).setLngLat(firstPoint).addTo(map);status('Now click the END point.','Drawing:');return}const s=normalize({name:`Road segment ${segments.length+1}`,start_lat:firstPoint.lat,start_lon:firstPoint.lng,end_lat:e.lngLat.lat,end_lon:e.lngLat.lng,...DEFAULTS});segments.push(s);selectedId=s.id;drawMode=false;firstPoint=null;if(tempMarker){tempMarker.remove();tempMarker=null}save();renderAll();status('Segment created. Finding the road route…','Created.');snapSegmentToRoad(s).then(n=>status(`Route created along roads (${n} shape points). Set the verified speed limit.`,'Snapped.')).catch(err=>status(`${err.message}. You can use “Snap selected to road” to retry.`,'Snap failed:'))});
 $('addBtn').onclick=()=>{drawMode=true;selectedId=null;if(startMarker){startMarker.remove();startMarker=null}if(endMarker){endMarker.remove();endMarker=null}if(tempMarker){tempMarker.remove();tempMarker=null}firstPoint=null;renderUI();renderMap();status('Click the START point, then click the END point.','Drawing:')};
-$('fitBtn').onclick=fitAll;$('snapBtn').onclick=snapSelected;$('snapAllBtn').onclick=snapAll;$('zoomBtn').onclick=zoomSelected;
+$('fitBtn').onclick=fitAll;$('resetBtn').onclick=()=>{if(confirm('Replace your current edits with the bundled route set? Export CSV first to keep a backup.'))importCsv(BUNDLED_CSV)};$('snapBtn').onclick=snapSelected;$('snapAllBtn').onclick=snapAll;$('zoomBtn').onclick=zoomSelected;
 $('reloadMapBtn').onclick=()=>changeStyle($('mapSource').value);$('mapSource').onchange=()=>changeStyle($('mapSource').value);function changeStyle(key){if(!STYLES[key])key='liberty';localStorage.setItem(MAP_SOURCE_KEY,key);map.setStyle(STYLES[key]);status(`Loading ${STYLE_NAMES[key]}…`,'Map:')}
 for(const id of ['name','limit','corridor','margin'])$(id).addEventListener('input',()=>{const s=selected();if(!s)return;s.name=$('name').value.trim()||'Unnamed road';s.limit_kph=Number($('limit').value)||DEFAULTS.limit_kph;s.corridor_m=Number($('corridor').value)||DEFAULTS.corridor_m;s.margin_kph=Math.max(0,Number($('margin').value)||0);save();renderAll()});
 $('deleteBtn').onclick=()=>{const s=selected();if(!s)return;if(!confirm(`Delete “${s.name}”?`))return;segments=segments.filter(x=>x.id!==s.id);selectedId=null;save();renderAll();status('Segment deleted.','Done.')};
 $('duplicateBtn').onclick=()=>{const s=selected();if(!s)return;const c=normalize({...s,id:undefined,name:s.name+' copy'});segments.push(c);selectedId=c.id;save();renderAll();zoomSelected();status('Duplicate created. Drag its endpoints to the next stretch.','Done.')};
 $('locateBtn').onclick=()=>{if(!navigator.geolocation){status('Geolocation is unavailable in this browser.','Error:');return}status('Requesting your current position…');navigator.geolocation.getCurrentPosition(p=>{map.flyTo({center:[p.coords.longitude,p.coords.latitude],zoom:16});status(`Accuracy about ${Math.round(p.coords.accuracy)} m.`,'Located.')},e=>status(e.message,'Location error:'),{enableHighAccuracy:true,timeout:10000})};
 function parseCsvLine(line){const out=[];let cur='',q=false;for(let i=0;i<line.length;i++){const c=line[i];if(q){if(c==='"'&&line[i+1]==='"'){cur+='"';i++}else if(c==='"')q=false;else cur+=c}else{if(c==='"')q=true;else if(c===','){out.push(cur);cur=''}else cur+=c}}out.push(cur);return out}
-function importCsv(text){const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));if(!lines.length)throw new Error('CSV is empty');const headers=parseCsvLine(lines[0]).map(x=>x.trim()),required=['name','start_lat','start_lon','end_lat','end_lon','limit_kph','corridor_m','margin_kph'];for(const h of required)if(!headers.includes(h))throw new Error(`Missing column: ${h}`);const imported=[];for(let i=1;i<lines.length;i++){const vals=parseCsvLine(lines[i]),row={};headers.forEach((h,j)=>row[h]=vals[j]??'');imported.push(normalize(row))}segments=imported;selectedId=null;save();renderAll();fitAll();status(`${segments.length} segment${segments.length===1?'':'s'} loaded and shown on the map.`,'Imported.')}
+function importCsv(text){
+ const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'));
+ if(!lines.length)throw new Error('CSV is empty');
+ const headers=parseCsvLine(lines[0]).map(x=>x.trim());
+ const required=['name','start_lat','start_lon','end_lat','end_lon','limit_kph','corridor_m','margin_kph'];
+ for(const h of required)if(!headers.includes(h))throw new Error(`Missing column: ${h}`);
+ const imported=[];
+ for(let i=1;i<lines.length;i++){
+   const vals=parseCsvLine(lines[i]),row={};
+   headers.forEach((h,j)=>row[h]=vals[j]??'');
+   const next=normalize(row),last=imported[imported.length-1];
+   // Exported routes consist of consecutive short legs. Reconstitute each continuous
+   // route rather than forcing the user to edit every GPS leg separately.
+   const same=last&&last.name===next.name&&last.limit_kph===next.limit_kph
+     &&last.margin_kph===next.margin_kph&&last.corridor_m===next.corridor_m;
+   const contiguous=same&&Math.abs(last.end_lat-next.start_lat)<0.000025
+     &&Math.abs(last.end_lon-next.start_lon)<0.000025;
+   if(contiguous){
+     if(!Array.isArray(last.path))last.path=[[last.start_lon,last.start_lat],[last.end_lon,last.end_lat]];
+     last.path.push([next.end_lon,next.end_lat]);
+     last.end_lat=next.end_lat;last.end_lon=next.end_lon;
+   }else imported.push(next);
+ }
+ segments=imported;selectedId=null;save();renderAll();fitAll();
+ const count=lines.length-1;
+ status(`${count} CSV rows combined into ${segments.length} editable route${segments.length===1?'':'s'}.`,'Imported.');
+}
 $('csvFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{importCsv(await f.text())}catch(err){status(err.message,'Import failed:')}e.target.value=''});
 function csvEscape(v){const s=String(v??'');return /[",\n\r]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
 function exportCsv(){
