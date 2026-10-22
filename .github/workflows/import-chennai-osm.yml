@@ -1,0 +1,100 @@
+name: Import Chennai OSM speed limits and build APK
+
+on:
+  push:
+    paths:
+      - '.github/workflows/import-chennai-osm.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-chennai-osm
+  cancel-in-progress: false
+
+jobs:
+  import-and-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Preserve existing manual roads and import explicit OSM limits
+        run: python3 tools/import_osm_speed_limits.py
+
+      - name: Check imported database contains both manual and OSM roads
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          p = Path("app/src/main/assets/speed_limits.csv")
+          rows = list(csv.DictReader(line for line in p.read_text(encoding="utf-8-sig").splitlines() if line.strip() and not line.lstrip().startswith("#")))
+          manual = [r for r in rows if not r["name"].startswith("OSM ")]
+          osm = [r for r in rows if r["name"].startswith("OSM ")]
+          assert len(manual) >= 94, f"Expected 94 existing manual road segments; found {len(manual)}"
+          assert len(osm) > 0, "No OSM speed-limit segments imported"
+          for row in rows:
+              assert 5 <= float(row["limit_kph"]) <= 200, f"Invalid speed: {row}"
+          print(f"Preserved {len(manual)} manual segments; imported {len(osm)} OSM segments")
+          with open(__import__("os").environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write(f"**Imported {len(osm)} OSM speed-limit segments** and preserved {len(manual)} manual segments.\n")
+          PY
+
+      - name: Commit imported Chennai roads to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add speed_limits.csv app/src/main/assets/speed_limits.csv
+          if git diff --cached --quiet; then
+            echo "No road-data changes"
+          else
+            git commit -m "Import explicit OpenStreetMap Chennai speed limits"
+            git push origin HEAD:main
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle 9.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Build SpeedBeep APK with imported roads
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK archive
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          unzip -t app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload SpeedBeep debug APK with OSM data
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeedBeep-OSM-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Upload merged speed-limit CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeedBeep-OSM-speed-database
+          path: app/src/main/assets/speed_limits.csv
+          retention-days: 30
