@@ -21,6 +21,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,6 +48,7 @@ public final class MainActivity extends Activity {
     private TextView csvText;
     private Button startButton;
     private Button stopButton;
+    private Button alarmButton;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final Runnable refreshRunnable = new Runnable() {
@@ -122,6 +125,11 @@ public final class MainActivity extends Activity {
         root.addView(buttons);
         startButton.setOnClickListener(v -> startMonitoring());
         stopButton.setOnClickListener(v -> stopMonitoring());
+
+        alarmButton = new Button(this);
+        alarmButton.setOnClickListener(v -> showAlarmSettings());
+        updateAlarmButton();
+        root.addView(alarmButton);
 
         Button fallbackButton = new Button(this);
         fallbackButton.setText("UNMAPPED ROAD SPEED SETTINGS");
@@ -209,6 +217,70 @@ public final class MainActivity extends Activity {
             return false;
         }
         return true;
+    }
+
+    private void updateAlarmButton() {
+        String mode = AlarmSoundPlayer.getSelectedMode(this);
+        String name = AlarmSoundPlayer.labels()[AlarmSoundPlayer.selectedIndex(mode)];
+        alarmButton.setText("ALARM SOUND: " + name.toUpperCase(Locale.US));
+    }
+
+    private String checkedAlarmMode(RadioGroup group, int[] radioIds) {
+        int checked = group.getCheckedRadioButtonId();
+        String[] modes = AlarmSoundPlayer.modes();
+        for (int i = 0; i < radioIds.length; i++) {
+            if (radioIds[i] == checked) return modes[i];
+        }
+        return AlarmSoundPlayer.BEEP;
+    }
+
+    private void showAlarmSettings() {
+        SharedPreferences settings = getSharedPreferences(SpeedMonitorService.SETTINGS, MODE_PRIVATE);
+        int selected = AlarmSoundPlayer.selectedIndex(AlarmSoundPlayer.getSelectedMode(this));
+        String[] labels = AlarmSoundPlayer.labels();
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(20), dp(8), dp(20), dp(8));
+
+        RadioGroup choices = new RadioGroup(this);
+        choices.setOrientation(RadioGroup.VERTICAL);
+        int[] radioIds = new int[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            RadioButton radio = new RadioButton(this);
+            radio.setId(View.generateViewId());
+            radio.setText(labels[i]);
+            radio.setPadding(0, dp(5), 0, dp(5));
+            radioIds[i] = radio.getId();
+            choices.addView(radio);
+        }
+        choices.check(radioIds[selected]);
+        layout.addView(choices);
+
+        TextView note = label("Voice announces the matched road's configured limit, "
+                + "not your current speed. On an unmapped road with user fallback enabled, "
+                + "it says 'User set limit XX'. Changes are saved on this phone. "
+                + "Only configure or preview sounds while parked.", 13, false);
+        note.setPadding(0, dp(12), 0, 0);
+        layout.addView(note);
+
+        AlarmSoundPlayer previewPlayer = new AlarmSoundPlayer(this);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Overspeed alarm")
+                .setView(layout)
+                .setNegativeButton("Cancel", null)
+                .setNeutralButton("Preview", null)
+                .setPositiveButton("Save", (d, which) -> {
+                    String chosenMode = checkedAlarmMode(choices, radioIds);
+                    settings.edit().putString(AlarmSoundPlayer.KEY_SOUND, chosenMode).apply();
+                    updateAlarmButton();
+                    toast("Alarm sound saved");
+                })
+                .create();
+        dialog.setOnDismissListener(d -> previewPlayer.close());
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
+                .setOnClickListener(v -> previewPlayer.preview(checkedAlarmMode(choices, radioIds))));
+        dialog.show();
     }
 
     private void showFallbackSettings() {
