@@ -9,7 +9,7 @@ A tiny local-first Android speed-limit warning app.
 - GPS speed from the phone
 - Road limits from a local CSV
 - Foreground location service so it can keep working with the screen off
-- Double-beep after you remain above `limit + margin` for 2 seconds; repeats every 4 seconds until you slow down
+- Selectable overspeed alarms: double-beep, synthesized siren, or spoken road speed limit; warns after 2 seconds over `limit + margin` and repeats every 4 seconds until you slow down
 
 ## V1 behavior
 
@@ -18,9 +18,21 @@ A tiny local-first Android speed-limit warning app.
 3. It matches your location to the nearest configured straight road segment.
 4. If GPS accuracy is worse than 60 m, it does not issue a speed warning.
 5. If there is no configured road segment nearby, it does not issue a warning.
-6. If your speed remains over `limit_kph + margin_kph` for 2 seconds, it double-beeps.
+6. If your speed remains over `limit_kph + margin_kph` for 2 seconds, it plays your chosen overspeed alarm.
 
 This is deliberately a driver aid, not an authoritative source of legal speed limits. The CSV is the source of truth, so only enter limits you have verified.
+
+## Alarm sound settings
+
+In the app, tap **Alarm Sound**, choose **Beep beep**, **Siren**, or **Voice: Speed limit XX**, then tap **Save**. Use **Preview** to test a sample 60 km/h announcement or sound **while parked**. Your selection is remembered locally, and changes also apply to an already-running monitoring service.
+
+- **Beep beep** is the original two-tone alert (default for existing installs).
+- **Siren** is a locally synthesized rising/falling tone. No sound files are needed.
+- **Voice** uses Android's built-in text-to-speech engine. It announces the matched CSV road's configured limit, such as "Speed limit 60" (not your current GPS speed).
+- If you enable a fallback limit for unmapped roads, the voice says "User set limit 40" rather than representing the fallback as a verified legal limit.
+- If the system text-to-speech engine/English voice is not installed or ready, audible alerts fall back to double-beep. No online speech API is used.
+
+As before, all overspeed warnings require an adequately accurate GPS fix and the existing 2-second hold. They repeat at 4-second intervals until you slow down.
 
 ## CSV format
 
