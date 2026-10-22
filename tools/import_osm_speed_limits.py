@@ -53,6 +53,7 @@ MANUAL_EXCLUSION_M = 25.0
 MAX_REASONABLE_KPH = 140
 
 OVERPASS_ENDPOINTS = [
+    "https://overpass.private.coffee/api/interpreter",
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.nchc.org.tw/api/interpreter",
@@ -237,6 +238,11 @@ def main() -> int:
         return 0
 
     osm_rows, stats = build_osm_rows(data, manual_segments)
+    if not osm_rows:
+        raise RuntimeError(
+            "OSM fetch returned no eligible road segments with explicit numeric maxspeed; "
+            "refusing to overwrite the existing database."
+        )
     write_csv(ROOT_CSV, manual_rows, osm_rows)
     write_csv(ASSET_CSV, manual_rows, osm_rows)
 
