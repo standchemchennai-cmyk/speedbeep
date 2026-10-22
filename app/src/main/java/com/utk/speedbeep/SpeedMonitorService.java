@@ -14,11 +14,8 @@ import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.media.AudioManager;
-import android.media.ToneGenerator;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -41,14 +38,13 @@ public final class SpeedMonitorService extends Service implements LocationListen
     private static final long BEEP_REPEAT_MS = 4000L;
 
     private LocationManager locationManager;
-    private ToneGenerator toneGenerator;
+    private AlarmSoundPlayer alarmPlayer;
     private List<RoadSegment> roads = Collections.emptyList();
     private RoadSegment currentRoad;
     private long overLimitSinceMs = 0L;
     private long lastBeepMs = 0L;
     private long lastNotificationUpdateMs = 0L;
     private long lastLogMs = 0L;
-    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onCreate() {
@@ -61,7 +57,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
             startForeground(NOTIFICATION_ID, starting);
         }
 
-        toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
+        alarmPlayer = new AlarmSoundPlayer(this);
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         try {
@@ -144,7 +140,8 @@ public final class SpeedMonitorService extends Service implements LocationListen
                 if (speedKph > defaultLimit + defaultMargin) {
                     if (overLimitSinceMs == 0) overLimitSinceMs = now;
                     if (now - overLimitSinceMs >= OVER_LIMIT_HOLD_MS && now - lastBeepMs >= BEEP_REPEAT_MS) {
-                        beep(); lastBeepMs = now;
+                        alarmPlayer.play(AlarmSoundPlayer.getSelectedMode(this), defaultLimit, true);
+                        lastBeepMs = now;
                     }
                 } else resetOverspeed();
                 RoadSegment virtual = new RoadSegment("Unmapped road (user default)",
@@ -171,7 +168,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
         if (over) {
             if (overLimitSinceMs == 0L) overLimitSinceMs = now;
             if (now - overLimitSinceMs >= OVER_LIMIT_HOLD_MS && now - lastBeepMs >= BEEP_REPEAT_MS) {
-                beep();
+                alarmPlayer.play(AlarmSoundPlayer.getSelectedMode(this), road.limitKph, false);
                 lastBeepMs = now;
             }
         } else {
@@ -198,13 +195,6 @@ public final class SpeedMonitorService extends Service implements LocationListen
         double kph = location.getSpeed() * 3.6;
         if (kph < 0) return 0.0;
         return Math.min(kph, 300.0);
-    }
-
-    private void beep() {
-        toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 300);
-        handler.postDelayed(() -> {
-            if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 220);
-        }, 420L);
     }
 
     private void resetOverspeed() {
@@ -286,11 +276,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
     @Override
     public void onDestroy() {
         if (locationManager != null) locationManager.removeUpdates(this);
-        if (toneGenerator != null) {
-            toneGenerator.release();
-            toneGenerator = null;
-        }
-        handler.removeCallbacksAndMessages(null);
+        if (alarmPlayer != null) alarmPlayer.close();
         writeStatus(false, 0, null, 0, 0, "Stopped");
         super.onDestroy();
     }
