@@ -12,6 +12,11 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.view.inputmethod.InputMethodManager;
+import android.text.InputType;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -49,6 +54,22 @@ public final class MainActivity extends Activity {
     private Button startButton;
     private Button stopButton;
     private Button alarmButton;
+    private EditText quickLimitInput;
+    private TextView quickRoadHint;
+    private TextView quickSavedHint;
+    private Button quickSetButton;
+    private LocationManager quickLocationManager;
+    private LocationListener quickLocationListener;
+    private Location latestUiLocation;
+    private List<RoadSegment> cachedRoads = java.util.Collections.emptyList();
+    private RoadSegment quickRoadSeed;
+    private List<RoadSegment> quickRoadParts = java.util.Collections.emptyList();
+    private long evaluatedFixTime = -1L;
+    private volatile boolean quickSaving = false;
+    private final java.util.concurrent.ExecutorService editExecutor =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+    private static final long MAX_QUICK_FIX_AGE_MS = 30000L;
+    private static final float MAX_QUICK_FIX_ACCURACY_M = 30f;
     private boolean selectingMapStretch = false;
     private double[] stretchStart;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -107,15 +128,6 @@ public final class MainActivity extends Activity {
         root.addView(limitText);
         root.addView(detailText);
 
-        tripMap = new OSMTripMap(this);
-        root.addView(tripMap, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(380)));
-        Button fitMap = new Button(this);
-        fitMap.setText("FIT ALL CONFIGURED ROADS");
-        fitMap.setOnClickListener(v -> tripMap.fitRoads());
-        root.addView(fitMap);
-        TextView mapHelp = label("OpenStreetMap: pinch to zoom, drag to pan. To override part of a long segment, choose SELECT A STRETCH and tap its start and end on the map while parked. Tiles need internet initially.", 13, false);
-        root.addView(mapHelp);
-
         LinearLayout buttons = new LinearLayout(this);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
         startButton = new Button(this);
@@ -127,6 +139,51 @@ public final class MainActivity extends Activity {
         root.addView(buttons);
         startButton.setOnClickListener(v -> startMonitoring());
         stopButton.setOnClickListener(v -> stopMonitoring());
+
+        TextView quickTitle = label("Set speed limit for this road", 18, true);
+        quickTitle.setPadding(0, dp(12), 0, dp(3));
+        root.addView(quickTitle);
+
+        // Two actions from the main screen: type km/h, tap SET THIS ROAD.
+        LinearLayout quickRow = new LinearLayout(this);
+        quickRow.setOrientation(LinearLayout.HORIZONTAL);
+        quickRow.setGravity(Gravity.CENTER_VERTICAL);
+        quickLimitInput = new EditText(this);
+        quickLimitInput.setSingleLine(true);
+        quickLimitInput.setHint("km/h");
+        quickLimitInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        quickLimitInput.setSelectAllOnFocus(true);
+        quickLimitInput.setTextSize(22f);
+        quickLimitInput.setContentDescription("New road speed limit in kilometres per hour");
+        quickRow.addView(quickLimitInput,
+                new LinearLayout.LayoutParams(0, dp(56), 1));
+
+        quickSetButton = new Button(this);
+        quickSetButton.setText("SET THIS ROAD");
+        quickSetButton.setOnClickListener(v -> setQuickCurrentRoadLimit());
+        quickRow.addView(quickSetButton, new LinearLayout.LayoutParams(0, dp(56), 2));
+        root.addView(quickRow);
+
+        quickRoadHint = label("Finding your current road…", 14, false);
+        quickRoadHint.setPadding(0, dp(4), 0, dp(3));
+        root.addView(quickRoadHint);
+        quickSavedHint = label("Only edit verified limits while parked.", 13, false);
+        root.addView(quickSavedHint);
+
+        Button exportButton = new Button(this);
+        exportButton.setText("EXPORT SPEED DATABASE");
+        exportButton.setOnClickListener(v -> exportCsv());
+        root.addView(exportButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+
+        tripMap = new OSMTripMap(this);
+        root.addView(tripMap, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(380)));
+        Button fitMap = new Button(this);
+        fitMap.setText("FIT ALL CONFIGURED ROADS");
+        fitMap.setOnClickListener(v -> tripMap.fitRoads());
+        root.addView(fitMap);
+        TextView mapHelp = label("OpenStreetMap: pinch to zoom, drag to pan. To override part of a long segment, choose SELECT A STRETCH and tap its start and end on the map while parked. Tiles need internet initially.", 13, false);
+        root.addView(mapHelp);
 
         alarmButton = new Button(this);
         alarmButton.setOnClickListener(v -> showAlarmSettings());
@@ -144,7 +201,7 @@ public final class MainActivity extends Activity {
         root.addView(editButton);
 
         Button currentRoadButton = new Button(this);
-        currentRoadButton.setText("SET SPEED LIMIT ON MY CURRENT ROAD");
+        currentRoadButton.setText("ADVANCED: ENTIRE ROAD OR ONE SEGMENT");
         currentRoadButton.setOnClickListener(v -> chooseCurrentRoadLimit());
         root.addView(currentRoadButton);
 
@@ -161,11 +218,6 @@ public final class MainActivity extends Activity {
         importButton.setText("IMPORT SPEED_LIMITS.CSV");
         importButton.setOnClickListener(v -> chooseCsv());
         root.addView(importButton, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
-
-        Button exportButton = new Button(this);
-        exportButton.setText("EXPORT CURRENT CSV");
-        exportButton.setOnClickListener(v -> exportCsv());
-        root.addView(exportButton, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
 
         Button exportLog = new Button(this);
         exportLog.setText("EXPORT DRIVE DIAGNOSTICS");
@@ -221,6 +273,194 @@ public final class MainActivity extends Activity {
         Intent i = new Intent(this, SpeedMonitorService.class).setAction(SpeedMonitorService.ACTION_STOP);
         startService(i);
         refreshStatus();
+    }
+
+    private static final class CurrentFix {
+        final double lat, lon;
+        final float accuracyM, speedKph;
+        final long timestamp;
+        CurrentFix(double lat, double lon, float accuracyM, float speedKph, long timestamp) {
+            this.lat = lat; this.lon = lon; this.accuracyM = accuracyM;
+            this.speedKph = speedKph; this.timestamp = timestamp;
+        }
+    }
+
+    private CurrentFix currentFix() {
+        CurrentFix fix = null;
+        if (latestUiLocation != null) {
+            long time = latestUiLocation.getTime();
+            if (time > 0 && time <= System.currentTimeMillis() + 3000L) {
+                fix = new CurrentFix(latestUiLocation.getLatitude(), latestUiLocation.getLongitude(),
+                        latestUiLocation.hasAccuracy() ? latestUiLocation.getAccuracy() : 999f,
+                        latestUiLocation.hasSpeed() ? latestUiLocation.getSpeed() * 3.6f : 0f, time);
+            }
+        }
+        SharedPreferences p = getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE);
+        long serviceTime = p.getLong("lastFixAt", 0);
+        if (serviceTime > 0 && (fix == null || serviceTime > fix.timestamp)) {
+            fix = new CurrentFix(p.getFloat("latitude", Float.NaN),
+                    p.getFloat("longitude", Float.NaN),
+                    p.getFloat("lastFixAccuracyM", 999f), p.getFloat("speedKph", 0f), serviceTime);
+        }
+        return fix;
+    }
+
+    private void beginQuickGps() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED || quickLocationListener != null) return;
+        quickLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (quickLocationManager == null) return;
+        quickLocationListener = new LocationListener() {
+            @Override public void onLocationChanged(Location location) {
+                latestUiLocation = location;
+                updateQuickRoadStatus();
+            }
+            @Override public void onProviderEnabled(String provider) { }
+            @Override public void onProviderDisabled(String provider) { }
+            @Override public void onStatusChanged(String provider, int status, Bundle extras) { }
+        };
+        try {
+            quickLocationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER, 1000L, 0f,
+                    quickLocationListener, Looper.getMainLooper());
+        } catch (SecurityException | IllegalArgumentException ex) {
+            quickLocationListener = null;
+            quickRoadHint.setText("Turn on GPS and allow precise location to set this road.");
+        }
+    }
+
+    private void endQuickGps() {
+        if (quickLocationManager != null && quickLocationListener != null) {
+            quickLocationManager.removeUpdates(quickLocationListener);
+        }
+        quickLocationListener = null;
+    }
+
+    private void updateQuickRoadStatus() {
+        if (quickRoadHint == null || quickSaving) return;
+        CurrentFix fix = currentFix();
+        long now = System.currentTimeMillis();
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            quickRoadSeed = null;
+            quickRoadParts = java.util.Collections.emptyList();
+            quickRoadHint.setText("Precise location permission needed. Tap SET THIS ROAD to allow it.");
+            return;
+        }
+        if (fix == null || fix.timestamp <= 0 || now < fix.timestamp - 3000L ||
+                now - fix.timestamp > MAX_QUICK_FIX_AGE_MS) {
+            quickRoadSeed = null;
+            quickRoadParts = java.util.Collections.emptyList();
+            evaluatedFixTime = -1L;
+            quickRoadHint.setText("Waiting for a fresh GPS fix on this road…");
+            return;
+        }
+        if (!Double.isFinite(fix.lat) || !Double.isFinite(fix.lon) ||
+                !Float.isFinite(fix.accuracyM) || fix.accuracyM > MAX_QUICK_FIX_ACCURACY_M) {
+            quickRoadSeed = null;
+            quickRoadParts = java.util.Collections.emptyList();
+            quickRoadHint.setText(String.format(Locale.US,
+                    "GPS uncertainty ±%.0f m; need ±30 m or better.", fix.accuracyM));
+            return;
+        }
+        // The existing database can contain thousands of rows. Re-evaluate only
+        // for a NEW GPS sample, and only rebuild connectivity when the seed changes.
+        if (evaluatedFixTime != fix.timestamp) {
+            evaluatedFixTime = fix.timestamp;
+            GeoMatcher.Match match = GeoMatcher.findBest(fix.lat, fix.lon, fix.accuracyM, cachedRoads);
+            RoadSegment candidate = match == null ? null : match.road;
+            if (candidate != quickRoadSeed) {
+                quickRoadSeed = candidate;
+                quickRoadParts = candidate == null
+                        ? java.util.Collections.emptyList()
+                        : RoadLimitEditor.connectedRoad(cachedRoads, candidate);
+            }
+        }
+        if (quickRoadSeed == null) {
+            quickRoadHint.setText("No configured road here. Select a stretch on the map to add one.");
+        } else {
+            double lengthM = 0;
+            for (RoadSegment segment : quickRoadParts) lengthM += RoadLimitEditor.lengthM(segment);
+            quickRoadHint.setText(String.format(Locale.US,
+                    "Target: %s • current %.0f km/h • %.0f m (%d linked pieces)",
+                    RoadLimitEditor.baseName(quickRoadSeed.name),
+                    quickRoadSeed.limitKph, lengthM, quickRoadParts.size()));
+        }
+        if (fix.speedKph > 5f) quickRoadHint.append(" • Stop before editing");
+    }
+
+    private void setQuickCurrentRoadLimit() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LOCATION);
+            return;
+        }
+        if (quickSaving || !editingAllowed()) return;
+        CurrentFix fix = currentFix();
+        if (fix == null || System.currentTimeMillis() - fix.timestamp > MAX_QUICK_FIX_AGE_MS ||
+                fix.accuracyM > MAX_QUICK_FIX_ACCURACY_M || !Double.isFinite(fix.lat) ||
+                !Double.isFinite(fix.lon)) {
+            toast("Wait for a GPS fix accurate to 30 m or better, while parked.");
+            return;
+        }
+        if (fix.speedKph > 5f) {
+            toast("Stop the vehicle before changing a road limit");
+            return;
+        }
+        final double newLimit;
+        try {
+            newLimit = Double.parseDouble(quickLimitInput.getText().toString().trim());
+            if (!Double.isFinite(newLimit) || newLimit < 5 || newLimit > 200) {
+                throw new NumberFormatException();
+            }
+        } catch (NumberFormatException ex) {
+            quickLimitInput.setError("Enter a speed from 5 to 200 km/h");
+            return;
+        }
+        // Match again against the latest CSV. Never apply a cached candidate
+        // after an import or another road edit.
+        quickSaving = true;
+        quickSetButton.setEnabled(false);
+        quickSavedHint.setText("Saving road limit…");
+        final double lat = fix.lat, lon = fix.lon;
+        final float accuracy = fix.accuracyM;
+        editExecutor.execute(() -> {
+            try {
+                List<RoadSegment> currentRoads = LocalRoadStore.load(this);
+                GeoMatcher.Match match = GeoMatcher.findBest(lat, lon, accuracy, currentRoads);
+                if (match == null) throw new IOException("No mapped road at this GPS position. Select its stretch on the map.");
+                List<RoadSegment> parts = RoadLimitEditor.connectedRoad(currentRoads, match.road);
+                if (parts.isEmpty()) throw new IOException("No road section to change.");
+                String name = RoadLimitEditor.baseName(match.road.name);
+                List<RoadSegment> newRoads = RoadLimitEditor.override(
+                        currentRoads, parts, newLimit, name);
+                LocalRoadStore.save(this, newRoads);
+                runOnUiThread(() -> {
+                    quickSaving = false;
+                    quickSetButton.setEnabled(true);
+                    quickRoadSeed = null;
+                    evaluatedFixTime = -1L;
+                    refreshCsvInfo();
+                    if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE)
+                            .getBoolean("running", false)) {
+                        startService(new Intent(this, SpeedMonitorService.class)
+                                .setAction(SpeedMonitorService.ACTION_RELOAD));
+                    }
+                    String saved = String.format(Locale.US,
+                            "Saved %.0f km/h on %s (%d pieces).",
+                            newLimit, name, parts.size());
+                    quickSavedHint.setText(saved);
+                    ((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE))
+                            .hideSoftInputFromWindow(quickLimitInput.getWindowToken(), 0);
+                    toast(saved);
+                });
+            } catch (Exception ex) {
+                runOnUiThread(() -> {
+                    quickSaving = false;
+                    quickSetButton.setEnabled(true);
+                    quickSavedHint.setText("Not saved: " + ex.getMessage());
+                    toast("Road limit not changed: " + ex.getMessage());
+                });
+            }
+        });
     }
 
     private boolean editingAllowed() {
@@ -591,13 +831,22 @@ public final class MainActivity extends Activity {
             toast("Permission is required for speed monitoring");
             return;
         }
-        if (requestCode == REQ_LOCATION || requestCode == REQ_NOTIFICATIONS) startMonitoring();
+        if (requestCode == REQ_LOCATION) {
+            beginQuickGps();
+            // No automatic change: the user must see the road match before saving.
+            updateQuickRoadStatus();
+        } else if (requestCode == REQ_NOTIFICATIONS) startMonitoring();
     }
 
     private void refreshCsvInfo() {
         try {
             List<RoadSegment> roads = LocalRoadStore.load(this);
+            cachedRoads = roads;
+            quickRoadSeed = null;
+            quickRoadParts = java.util.Collections.emptyList();
+            evaluatedFixTime = -1L;
             tripMap.setRoads(roads);
+            updateQuickRoadStatus();
             csvText.setText("CSV: " + roads.size() + " road segment" + (roads.size() == 1 ? "" : "s") + " loaded");
         } catch (IOException ex) {
             csvText.setText("CSV ERROR: " + ex.getMessage());
@@ -638,10 +887,25 @@ public final class MainActivity extends Activity {
         }
         startButton.setEnabled(!running);
         stopButton.setEnabled(running);
+        updateQuickRoadStatus();
     }
 
     private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_LONG).show(); }
 
-    @Override protected void onResume() { super.onResume(); tripMap.onResume(); handler.post(refreshRunnable); }
-    @Override protected void onPause() { handler.removeCallbacks(refreshRunnable); tripMap.onPause(); super.onPause(); }
+    @Override protected void onResume() {
+        super.onResume();
+        tripMap.onResume();
+        beginQuickGps();
+        handler.post(refreshRunnable);
+    }
+    @Override protected void onPause() {
+        handler.removeCallbacks(refreshRunnable);
+        endQuickGps();
+        tripMap.onPause();
+        super.onPause();
+    }
+    @Override protected void onDestroy() {
+        editExecutor.shutdown();
+        super.onDestroy();
+    }
 }
