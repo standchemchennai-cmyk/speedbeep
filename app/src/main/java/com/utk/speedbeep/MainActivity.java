@@ -281,11 +281,14 @@ public final class MainActivity extends Activity {
 
     private static final class CurrentFix {
         final double lat, lon;
-        final float accuracyM, speedKph;
+        final float accuracyM, speedKph, bearingDeg;
+        final boolean hasBearing;
         final long timestamp;
-        CurrentFix(double lat, double lon, float accuracyM, float speedKph, long timestamp) {
+        CurrentFix(double lat, double lon, float accuracyM, float speedKph,
+                   boolean hasBearing, float bearingDeg, long timestamp) {
             this.lat = lat; this.lon = lon; this.accuracyM = accuracyM;
             this.speedKph = speedKph; this.timestamp = timestamp;
+            this.hasBearing = hasBearing; this.bearingDeg = bearingDeg;
         }
     }
 
@@ -296,7 +299,9 @@ public final class MainActivity extends Activity {
             if (time > 0 && time <= System.currentTimeMillis() + 3000L) {
                 fix = new CurrentFix(latestUiLocation.getLatitude(), latestUiLocation.getLongitude(),
                         latestUiLocation.hasAccuracy() ? latestUiLocation.getAccuracy() : 999f,
-                        latestUiLocation.hasSpeed() ? latestUiLocation.getSpeed() * 3.6f : 0f, time);
+                        latestUiLocation.hasSpeed() ? latestUiLocation.getSpeed() * 3.6f : 0f,
+                        latestUiLocation.hasBearing(),
+                        latestUiLocation.hasBearing() ? latestUiLocation.getBearing() : 0f, time);
             }
         }
         SharedPreferences p = getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE);
@@ -304,7 +309,10 @@ public final class MainActivity extends Activity {
         if (serviceTime > 0 && (fix == null || serviceTime > fix.timestamp)) {
             fix = new CurrentFix(p.getFloat("latitude", Float.NaN),
                     p.getFloat("longitude", Float.NaN),
-                    p.getFloat("lastFixAccuracyM", 999f), p.getFloat("speedKph", 0f), serviceTime);
+                    p.getFloat("lastFixAccuracyM", 999f),
+                    p.getFloat("lastFixSpeedKph", p.getFloat("speedKph", 0f)),
+                    p.getBoolean("lastFixHasBearing", false),
+                    p.getFloat("lastFixBearing", 0f), serviceTime);
         }
         return fix;
     }
@@ -380,7 +388,7 @@ public final class MainActivity extends Activity {
             }
         }
         if (quickRoadSeed == null) {
-            quickRoadHint.setText("No configured road here. Select a stretch on the map to add one.");
+            quickRoadHint.setText("No saved speed limit here • SET THIS ROAD can automatically identify it.");
         } else {
             double lengthM = 0;
             for (RoadSegment segment : quickRoadParts) lengthM += RoadLimitEditor.lengthM(segment);
@@ -415,24 +423,52 @@ public final class MainActivity extends Activity {
             quickLimitInput.setError("Enter a speed from 5 to 200 km/h");
             return;
         }
-        // Match again against the latest CSV. Never apply a cached candidate
-        // after an import or another road edit.
+        // Capture the exact GPS point and direction AT THE MOMENT OF THE TAP,
+        // so results arriving from a network request do not affect another road.
         quickSaving = true;
         quickSetButton.setEnabled(false);
-        quickSavedHint.setText("Saving road limit…");
+        quickSavedHint.setText("Detecting road and saving limit…");
         final double lat = fix.lat, lon = fix.lon;
         final float accuracy = fix.accuracyM;
+        final boolean hasBearing = fix.hasBearing;
+        final float bearing = fix.bearingDeg;
+        final float speed = fix.speedKph;
+
         editExecutor.execute(() -> {
             try {
                 List<RoadSegment> currentRoads = LocalRoadStore.load(this);
-                GeoMatcher.Match match = GeoMatcher.findBest(lat, lon, accuracy, currentRoads);
-                if (match == null) throw new IOException("No mapped road at this GPS position. Select its stretch on the map.");
-                List<RoadSegment> parts = RoadLimitEditor.connectedRoad(currentRoads, match.road);
-                if (parts.isEmpty()) throw new IOException("No road section to change.");
-                String name = RoadLimitEditor.baseName(match.road.name);
-                List<RoadSegment> newRoads = RoadLimitEditor.override(
-                        currentRoads, parts, newLimit, name);
-                LocalRoadStore.save(this, newRoads);
+                GeoMatcher.Match localMatch = GeoMatcher.findBest(lat, lon, 0, currentRoads);
+                String roadName;
+                String source;
+                List<RoadSegment> parts;
+                // A close match is already fully stored on the phone. Keep
+                // this path fast and offline, without an unnecessary HTTP call.
+                if (localMatch != null && localMatch.distanceM <= 9.0) {
+                    roadName = RoadLimitEditor.baseName(localMatch.road.name);
+                    parts = RoadLimitEditor.connectedRoad(currentRoads, localMatch.road);
+                    source = "local road database";
+                } else {
+                    // OSM contains highway geometry even where NO maxspeed tag
+                    // exists. Retrieve and save it automatically on this tap.
+                    OverpassRoadResolver.Result discovered = OverpassRoadResolver.resolve(
+                            lat, lon, accuracy, hasBearing, bearing, speed);
+                    roadName = discovered.name;
+                    parts = discovered.pieces;
+                    source = discovered.extended
+                            ? "OpenStreetMap road geometry"
+                            : "OpenStreetMap way (limited coverage)";
+                }
+                if (parts.isEmpty()) throw new IOException("No connected road geometry found.");
+                final String chosenRoad = roadName;
+                final String detectedFrom = source;
+                final int affectedPieces = parts.size();
+                double meters = 0;
+                for (RoadSegment part : parts) meters += RoadLimitEditor.lengthM(part);
+                final double updatedLengthM = meters;
+
+                List<RoadSegment> updated = RoadLimitEditor.override(
+                        currentRoads, parts, newLimit, roadName);
+                LocalRoadStore.save(this, updated);
                 runOnUiThread(() -> {
                     quickSaving = false;
                     quickSetButton.setEnabled(true);
@@ -445,8 +481,8 @@ public final class MainActivity extends Activity {
                                 .setAction(SpeedMonitorService.ACTION_RELOAD));
                     }
                     String saved = String.format(Locale.US,
-                            "Saved %.0f km/h on %s (%d pieces).",
-                            newLimit, name, parts.size());
+                            "Saved %.0f km/h on %s • %.0f m (%d sections; %s).",
+                            newLimit, chosenRoad, updatedLengthM, affectedPieces, detectedFrom);
                     quickSavedHint.setText(saved);
                     InputMethodManager keyboard =
                             (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
