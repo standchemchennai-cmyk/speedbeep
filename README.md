@@ -46,9 +46,27 @@ precise location is permitted; there is no need to start the speed-monitoring
 service just to edit a limit. The app accepts speed-limit edits while moving
 and reloads the modified database without interrupting speed monitoring.
 It requires a recent GPS fix (within 10 seconds, accuracy of 30 metres or better),
-so an old position cannot overwrite a different road. A mismatched or unmapped
-road is not changed; use the map selector to add unmapped geometry or adjust
-a precise piece. A passenger should make edits when the vehicle is moving;
+so an old position cannot overwrite a different road.
+
+**Automatic road creation when no speed limit is mapped:** Tap
+**SET THIS ROAD** as usual. If no near-exact matching segment is in the local
+CSV, the app requests nearby drivable road geometry from an OpenStreetMap
+Overpass API server. It uses GPS and (when available) your movement direction
+to detect the current road, loads connected ways of the same street name within
+approximately 2.2 km, and stores the new speed limit on those actual mapped
+road segments, including a split of overlapping old speed-limit segments.
+No drawing on the map, extra dialog, or manual start/end markers are needed.
+
+This feature needs mobile data or Wi-Fi **when discovering a road not yet
+recorded locally**, but ordinary speed monitoring and edits to confidently
+matched existing roads remain offline. The explicit lookup sends the current
+GPS coordinates to the public Overpass service; it does not upload your CSV.
+For a street with no name/ref, only the matched OpenStreetMap way is added.
+The 2.2-km discovery radius is not a guarantee of the entire legal speed-limit
+zone or entire city-spanning road. When map matching is ambiguous (junctions
+or nearby parallel roads), the app refuses to guess; try another GPS fix.
+The detailed map editor remains available as a fallback if OSM geometry is
+unavailable. A passenger should make edits while the vehicle is moving;
 the driver must keep attention on the road.
 
 **SET THIS ROAD** changes every *connected, same-named stretch present in the
