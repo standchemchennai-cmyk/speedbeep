@@ -27,6 +27,7 @@ import java.util.Locale;
 
 public final class SpeedMonitorService extends Service implements LocationListener {
     public static final String ACTION_STOP = "com.utk.speedbeep.STOP";
+    public static final String ACTION_RELOAD = "com.utk.speedbeep.RELOAD_ROADS";
     public static final String PREFS = "speedbeep_status";
 
     public static final String SETTINGS = "speedbeep_settings";
@@ -77,6 +78,16 @@ public final class SpeedMonitorService extends Service implements LocationListen
             stopSelf();
             return START_NOT_STICKY;
         }
+        if (intent != null && ACTION_RELOAD.equals(intent.getAction())) {
+            try {
+                roads = LocalRoadStore.load(this);
+                currentRoad = null;
+                resetOverspeed();
+                updateNotification("Speed-limit database updated");
+            } catch (IOException ex) {
+                updateNotification("Road update failed: " + ex.getMessage());
+            }
+        }
         return START_STICKY;
     }
 
@@ -107,7 +118,12 @@ public final class SpeedMonitorService extends Service implements LocationListen
 
     @Override
     public void onLocationChanged(Location location) {
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putFloat("latitude", (float) location.getLatitude()).putFloat("longitude", (float) location.getLongitude()).apply();
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putFloat("latitude", (float) location.getLatitude())
+                .putFloat("longitude", (float) location.getLongitude())
+                .putFloat("lastFixAccuracyM", location.hasAccuracy() ? location.getAccuracy() : 999f)
+                .putLong("lastFixAt", System.currentTimeMillis())
+                .apply();
         double speedKph = getSpeedKph(location);
         float accuracy = location.hasAccuracy() ? location.getAccuracy() : 999f;
 
