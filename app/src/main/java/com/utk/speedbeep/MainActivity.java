@@ -441,9 +441,10 @@ public final class MainActivity extends Activity {
                 String roadName;
                 String source;
                 List<RoadSegment> parts;
-                // A close match is already fully stored on the phone. Keep
-                // this path fast and offline, without an unnecessary HTTP call.
-                if (localMatch != null && localMatch.distanceM <= 9.0) {
+                // A near-exact local match can be saved instantly and offline.
+                // Wider offsets might be a DIFFERENT unmapped service lane;
+                // prefer OSM road detection rather than overwriting that lane.
+                if (localMatch != null && localMatch.distanceM <= 4.0) {
                     roadName = RoadLimitEditor.baseName(localMatch.road.name);
                     parts = RoadLimitEditor.connectedRoad(currentRoads, localMatch.road);
                     source = "local road database";
