@@ -122,6 +122,9 @@ public final class SpeedMonitorService extends Service implements LocationListen
                 .putFloat("latitude", (float) location.getLatitude())
                 .putFloat("longitude", (float) location.getLongitude())
                 .putFloat("lastFixAccuracyM", location.hasAccuracy() ? location.getAccuracy() : 999f)
+                .putBoolean("lastFixHasBearing", location.hasBearing())
+                .putFloat("lastFixBearing", location.hasBearing() ? location.getBearing() : 0f)
+                .putFloat("lastFixSpeedKph", (float) getSpeedKph(location))
                 .putLong("lastFixAt", System.currentTimeMillis())
                 .apply();
         double speedKph = getSpeedKph(location);
