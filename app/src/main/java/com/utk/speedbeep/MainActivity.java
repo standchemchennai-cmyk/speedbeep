@@ -474,15 +474,17 @@ public final class MainActivity extends Activity {
 
     private void chooseCurrentRoadLimit() {
         if (!editingAllowed()) return;
-        SharedPreferences status = getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE);
-        long fixAge = System.currentTimeMillis() - status.getLong("lastFixAt", 0L);
-        float accuracy = status.getFloat("lastFixAccuracyM", 999f);
-        if (fixAge < 0 || fixAge > 10 * 60 * 1000L || accuracy > 35f) {
-            toast("No recent accurate GPS fix. Start monitoring while parked, let GPS settle, then try again.");
+        CurrentFix fix = currentFix();
+        long ageMs = fix == null ? Long.MAX_VALUE : System.currentTimeMillis() - fix.timestamp;
+        if (fix == null || ageMs < 0 || ageMs > MAX_QUICK_FIX_AGE_MS ||
+                !Double.isFinite(fix.lat) || !Double.isFinite(fix.lon) ||
+                !Float.isFinite(fix.accuracyM) || fix.accuracyM > MAX_QUICK_FIX_ACCURACY_M) {
+            toast("GPS not ready. Need a recent fix accurate to 30 m or better.");
             return;
         }
-        double latitude = status.getFloat("latitude", Float.NaN);
-        double longitude = status.getFloat("longitude", Float.NaN);
+        double latitude = fix.lat;
+        double longitude = fix.lon;
+        float accuracy = fix.accuracyM;
         try {
             List<RoadSegment> roads = LocalRoadStore.load(this);
             GeoMatcher.Match nearest = GeoMatcher.findBest(latitude, longitude, accuracy, roads);
