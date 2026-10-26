@@ -49,6 +49,8 @@ public final class MainActivity extends Activity {
     private Button startButton;
     private Button stopButton;
     private Button alarmButton;
+    private boolean selectingMapStretch = false;
+    private double[] stretchStart;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final Runnable refreshRunnable = new Runnable() {
@@ -111,7 +113,7 @@ public final class MainActivity extends Activity {
         fitMap.setText("FIT ALL CONFIGURED ROADS");
         fitMap.setOnClickListener(v -> tripMap.fitRoads());
         root.addView(fitMap);
-        TextView mapHelp = label("OpenStreetMap: pinch to zoom and drag to pan. Tiles need internet on first view; cached tiles may work offline. Review while parked.", 13, false);
+        TextView mapHelp = label("OpenStreetMap: pinch to zoom, drag to pan. To override part of a long segment, choose SELECT A STRETCH and tap its start and end on the map while parked. Tiles need internet initially.", 13, false);
         root.addView(mapHelp);
 
         LinearLayout buttons = new LinearLayout(this);
@@ -140,6 +142,16 @@ public final class MainActivity extends Activity {
         editButton.setText("EDIT CONFIGURED ROAD LIMITS");
         editButton.setOnClickListener(v -> chooseRoadToEdit());
         root.addView(editButton);
+
+        Button currentRoadButton = new Button(this);
+        currentRoadButton.setText("SET SPEED LIMIT ON MY CURRENT ROAD");
+        currentRoadButton.setOnClickListener(v -> chooseCurrentRoadLimit());
+        root.addView(currentRoadButton);
+
+        Button pickStretchButton = new Button(this);
+        pickStretchButton.setText("SELECT A STRETCH ON MAP (SPLIT EXISTING LIMIT)");
+        pickStretchButton.setOnClickListener(v -> chooseMapStretch());
+        root.addView(pickStretchButton);
 
         csvText = label("CSV: checking…", 14, false);
         csvText.setPadding(0, dp(22), 0, dp(8));
@@ -212,11 +224,160 @@ public final class MainActivity extends Activity {
     }
 
     private boolean editingAllowed() {
-        if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE).getBoolean("running", false)) {
-            toast("Stop monitoring and park before editing roads");
-            return false;
+        SharedPreferences status = getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE);
+        if (status.getBoolean("running", false)) {
+            long age = System.currentTimeMillis() - status.getLong("updatedAt", 0L);
+            if (age > 15000 || status.getFloat("speedKph", 0f) > 5f) {
+                toast("Park and wait for a fresh GPS reading before editing roads");
+                return false;
+            }
         }
         return true;
+    }
+
+    private void chooseCurrentRoadLimit() {
+        if (!editingAllowed()) return;
+        SharedPreferences status = getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE);
+        long fixAge = System.currentTimeMillis() - status.getLong("lastFixAt", 0L);
+        float accuracy = status.getFloat("lastFixAccuracyM", 999f);
+        if (fixAge < 0 || fixAge > 10 * 60 * 1000L || accuracy > 35f) {
+            toast("No recent accurate GPS fix. Start monitoring while parked, let GPS settle, then try again.");
+            return;
+        }
+        double latitude = status.getFloat("latitude", Float.NaN);
+        double longitude = status.getFloat("longitude", Float.NaN);
+        try {
+            List<RoadSegment> roads = LocalRoadStore.load(this);
+            GeoMatcher.Match nearest = GeoMatcher.findBest(latitude, longitude, accuracy, roads);
+            if (nearest == null) {
+                toast("No mapped speed-limit road here. Use SELECT A STRETCH on the map to add a new limit.");
+                return;
+            }
+            RoadSegment road = nearest.road;
+            List<RoadSegment> connected = RoadLimitEditor.connectedRoad(roads, road);
+            double meters = 0;
+            for (RoadSegment segment : connected) meters += RoadLimitEditor.lengthM(segment);
+            String detail = String.format(Locale.US,
+                    "Detected: %s (%.0f m from GPS)\\nConnected road: %d pieces, about %.1f km.\\n\\n" +
+                    "Choose ENTIRE ROAD to update all connected pieces of this road name, " +
+                    "or THIS PIECE for only the detected CSV section. Other roads will not change. " +
+                    "For precise boundaries within a longer piece, use SELECT A STRETCH on the map.",
+                    RoadLimitEditor.baseName(road.name), nearest.distanceM, connected.size(), meters / 1000.0);
+            new AlertDialog.Builder(this)
+                    .setTitle("Set current road limit")
+                    .setMessage(detail)
+                    .setNegativeButton("Cancel", null)
+                    .setNeutralButton("This piece", (d, w) ->
+                            promptRoadLimit(roads, java.util.Collections.singletonList(road), road.name))
+                    .setPositiveButton("Entire road", (d, w) ->
+                            promptRoadLimit(roads, connected, road.name))
+                    .show();
+        } catch (IOException ex) {
+            toast("Unable to read road limits: " + ex.getMessage());
+        }
+    }
+
+    private void chooseMapStretch() {
+        if (!editingAllowed()) return;
+        if (selectingMapStretch) {
+            stopMapSelection();
+            toast("Map stretch selection cancelled");
+            return;
+        }
+        selectingMapStretch = true;
+        stretchStart = null;
+        tripMap.clearEditPoints();
+        tripMap.setPointTapListener((lat, lon) -> {
+            if (!selectingMapStretch) return;
+            if (stretchStart == null) {
+                stretchStart = new double[]{lat, lon};
+                tripMap.markEditPoint(lat, lon, "New limit begins");
+                toast("Start marked. Now tap the END of the stretch on the map.");
+            } else {
+                double[] start = stretchStart;
+                stopMapSelection();
+                promptMapStretch(start[0], start[1], lat, lon);
+            }
+        });
+        SharedPreferences status = getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE);
+        float lat = status.getFloat("latitude", Float.NaN);
+        float lon = status.getFloat("longitude", Float.NaN);
+        if (Float.isFinite(lat) && Float.isFinite(lon)) tripMap.centerOn(lat, lon);
+        toast("Zoom in and tap the START, then END of the intended road stretch. Tap the button again to cancel.");
+    }
+
+    private void stopMapSelection() {
+        selectingMapStretch = false;
+        stretchStart = null;
+        tripMap.setPointTapListener(null);
+        tripMap.clearEditPoints();
+    }
+
+    private void promptMapStretch(double startLat, double startLon, double endLat, double endLon) {
+        try {
+            List<RoadSegment> roads = LocalRoadStore.load(this);
+            GeoMatcher.Match a = GeoMatcher.findBest(startLat, startLon, 0, roads);
+            GeoMatcher.Match b = GeoMatcher.findBest(endLat, endLon, 0, roads);
+            RoadSegment piece;
+            if (a != null && b != null && a.road == b.road &&
+                    a.distanceM <= 20 && b.distanceM <= 20) {
+                // Precise snapping permits cutting an existing long segment in THREE parts.
+                piece = RoadLimitEditor.betweenTaps(a.road, startLat, startLon, endLat, endLon);
+            } else if (a == null && b == null) {
+                // No geometry in the offline CSV: the user can define a new straight road.
+                piece = new RoadSegment("New unmapped stretch", startLat, startLon, endLat, endLon,
+                        40, 20, 3);
+                if (RoadLimitEditor.lengthM(piece) < 2) {
+                    toast("Choose two different points"); return;
+                }
+            } else {
+                toast("Choose both endpoints on the SAME configured straight segment. " +
+                        "For a curved road, edit its connected road or repeat with shorter stretches.");
+                return;
+            }
+            promptRoadLimit(roads, java.util.Collections.singletonList(piece), piece.name);
+        } catch (Exception ex) {
+            toast("Could not select stretch: " + ex.getMessage());
+        }
+    }
+
+    private void promptRoadLimit(List<RoadSegment> roads, List<RoadSegment> selected, String suggestedName) {
+        if (!editingAllowed()) return;
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(20), dp(8), dp(20), dp(8));
+        EditText name = new EditText(this);
+        name.setHint("Road name");
+        name.setSingleLine(true);
+        name.setText(RoadLimitEditor.baseName(suggestedName));
+        layout.addView(name);
+        EditText limit = new EditText(this);
+        limit.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        limit.setHint("New limit, km/h");
+        limit.setText(String.valueOf((int) selected.get(0).limitKph));
+        layout.addView(limit);
+        double total = 0;
+        for (RoadSegment section : selected) total += RoadLimitEditor.lengthM(section);
+        TextView note = label(String.format(Locale.US,
+                "Overwrite limit on %d selected piece(s), approximately %.0f metres. " +
+                "Where it overlaps an older longer segment, the unaffected sections keep their limits. " +
+                "Please use verified posted limits, not estimates.",
+                selected.size(), total), 14, false);
+        layout.addView(note);
+        new AlertDialog.Builder(this)
+                .setTitle("Override road speed limit")
+                .setView(layout)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", (d, w) -> {
+                    try {
+                        double value = Double.parseDouble(limit.getText().toString().trim());
+                        List<RoadSegment> result = RoadLimitEditor.override(
+                                roads, selected, value, name.getText().toString().trim());
+                        saveEditedRoads(result);
+                    } catch (IllegalArgumentException ex) {
+                        toast("Invalid speed limit or road: " + ex.getMessage());
+                    }
+                }).show();
     }
 
     private void updateAlarmButton() {
@@ -354,7 +515,14 @@ public final class MainActivity extends Activity {
     }
 
     private void saveEditedRoads(List<RoadSegment> roads) {
-        try { LocalRoadStore.save(this,roads);refreshCsvInfo();toast("Road changes saved"); }
+        try {
+            LocalRoadStore.save(this, roads);
+            refreshCsvInfo();
+            if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE).getBoolean("running", false)) {
+                startService(new Intent(this, SpeedMonitorService.class).setAction(SpeedMonitorService.ACTION_RELOAD));
+            }
+            toast("Road changes saved");
+        }
         catch(IOException ex) { toast("Save failed: "+ex.getMessage()); }
     }
 
@@ -384,6 +552,9 @@ public final class MainActivity extends Activity {
                 int count = LocalRoadStore.importCsv(this, in);
                 toast("Imported " + count + " road segments");
                 refreshCsvInfo();
+                if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE).getBoolean("running", false)) {
+                    startService(new Intent(this, SpeedMonitorService.class).setAction(SpeedMonitorService.ACTION_RELOAD));
+                }
             } catch (Exception ex) {
                 toast("Import failed: " + ex.getMessage());
             }
