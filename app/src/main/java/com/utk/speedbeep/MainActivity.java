@@ -258,7 +258,7 @@ public final class MainActivity extends Activity {
             double meters = 0;
             for (RoadSegment segment : connected) meters += RoadLimitEditor.lengthM(segment);
             String detail = String.format(Locale.US,
-                    "Detected: %s (%.0f m from GPS)\\nConnected road: %d pieces, about %.1f km.\\n\\n" +
+                    "Detected: %s (%.0f m from GPS)\nConnected road: %d pieces, about %.1f km.\n\n" +
                     "Choose ENTIRE ROAD to update all connected pieces of this road name, " +
                     "or THIS PIECE for only the detected CSV section. Other roads will not change. " +
                     "For precise boundaries within a longer piece, use SELECT A STRETCH on the map.",
