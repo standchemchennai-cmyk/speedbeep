@@ -69,7 +69,9 @@ public final class MainActivity extends Activity {
     private boolean startAfterLocationPermission = false;
     private final java.util.concurrent.ExecutorService editExecutor =
             java.util.concurrent.Executors.newSingleThreadExecutor();
-    private static final long MAX_QUICK_FIX_AGE_MS = 30000L;
+    // Only a recent GPS sample is allowed, especially when the vehicle is moving.
+    // A speed-based lock is unnecessary: edits apply to the road at tap time.
+    private static final long MAX_QUICK_FIX_AGE_MS = 10000L;
     private static final float MAX_QUICK_FIX_ACCURACY_M = 30f;
     private boolean selectingMapStretch = false;
     private double[] stretchStart;
@@ -168,7 +170,7 @@ public final class MainActivity extends Activity {
         quickRoadHint = label("Finding your current road…", 14, false);
         quickRoadHint.setPadding(0, dp(4), 0, dp(3));
         root.addView(quickRoadHint);
-        quickSavedHint = label("Only edit verified limits while parked.", 13, false);
+        quickSavedHint = label("Uses your live GPS road match. Save only verified speed limits.", 13, false);
         root.addView(quickSavedHint);
 
         Button exportButton = new Button(this);
@@ -183,7 +185,7 @@ public final class MainActivity extends Activity {
         fitMap.setText("FIT ALL CONFIGURED ROADS");
         fitMap.setOnClickListener(v -> tripMap.fitRoads());
         root.addView(fitMap);
-        TextView mapHelp = label("OpenStreetMap: pinch to zoom, drag to pan. To override part of a long segment, choose SELECT A STRETCH and tap its start and end on the map while parked. Tiles need internet initially.", 13, false);
+        TextView mapHelp = label("OpenStreetMap: pinch to zoom, drag to pan. To override part of a long segment, choose SELECT A STRETCH and tap its start and end. Tiles need internet initially.", 13, false);
         root.addView(mapHelp);
 
         alarmButton = new Button(this);
@@ -387,7 +389,7 @@ public final class MainActivity extends Activity {
                     RoadLimitEditor.baseName(quickRoadSeed.name),
                     quickRoadSeed.limitKph, lengthM, quickRoadParts.size()));
         }
-        if (fix.speedKph > 5f) quickRoadHint.append(" • Stop before editing");
+
     }
 
     private void setQuickCurrentRoadLimit() {
@@ -400,11 +402,7 @@ public final class MainActivity extends Activity {
         if (fix == null || System.currentTimeMillis() - fix.timestamp > MAX_QUICK_FIX_AGE_MS ||
                 fix.accuracyM > MAX_QUICK_FIX_ACCURACY_M || !Double.isFinite(fix.lat) ||
                 !Double.isFinite(fix.lon)) {
-            toast("Wait for a GPS fix accurate to 30 m or better, while parked.");
-            return;
-        }
-        if (fix.speedKph > 5f) {
-            toast("Stop the vehicle before changing a road limit");
+            toast("GPS not ready. Need a recent fix accurate to 30 m or better.");
             return;
         }
         final double newLimit;
@@ -469,14 +467,8 @@ public final class MainActivity extends Activity {
     }
 
     private boolean editingAllowed() {
-        SharedPreferences status = getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE);
-        if (status.getBoolean("running", false)) {
-            long age = System.currentTimeMillis() - status.getLong("updatedAt", 0L);
-            if (age > 15000 || status.getFloat("speedKph", 0f) > 5f) {
-                toast("Park and wait for a fresh GPS reading before editing roads");
-                return false;
-            }
-        }
+        // Editing is permitted while monitoring or travelling. GPS validation
+        // happens in the GPS-based editors; selecting geometry works offline.
         return true;
     }
 
@@ -548,7 +540,7 @@ public final class MainActivity extends Activity {
         float lat = status.getFloat("latitude", Float.NaN);
         float lon = status.getFloat("longitude", Float.NaN);
         if (Float.isFinite(lat) && Float.isFinite(lon)) tripMap.centerOn(lat, lon);
-        toast("Zoom in and tap the START, then END of the intended road stretch. Tap the button again to cancel.");
+        toast("Tap the START and END of the road stretch. Tap the button again to cancel.");
     }
 
     private void stopMapSelection() {
