@@ -4,7 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
+import java.util.IdentityHashMap;
+import java.util.Set;
 
 /**
  * Local, geometry-aware speed-limit overrides.
@@ -27,14 +28,23 @@ public final class RoadLimitEditor {
     public static List<RoadSegment> connectedRoad(List<RoadSegment> roads, RoadSegment seed) {
         if (seed == null) return Collections.emptyList();
         List<RoadSegment> found = new ArrayList<>();
+        Set<RoadSegment> seen = Collections.newSetFromMap(new IdentityHashMap<>());
         found.add(seed);
+        seen.add(seed);
         String roadName = baseName(seed.name);
+        List<RoadSegment> sameName = new ArrayList<>();
+        for (RoadSegment road : roads) {
+            if (roadName.equals(baseName(road.name))) sameName.add(road);
+        }
         // Endpoint connectivity only: no jumping across parallel roads or disconnected streets.
         for (int cursor = 0; cursor < found.size(); cursor++) {
             RoadSegment candidate = found.get(cursor);
-            for (RoadSegment road : roads) {
-                if (found.contains(road) || !roadName.equals(baseName(road.name))) continue;
-                if (connected(candidate, road)) found.add(road);
+            for (RoadSegment road : sameName) {
+                if (seen.contains(road)) continue;
+                if (connected(candidate, road)) {
+                    seen.add(road);
+                    found.add(road);
+                }
             }
         }
         return found;
