@@ -67,6 +67,18 @@ jobs:
         with:
           gradle-version: '9.6.0'
 
+      - name: Verify speed-limit segment editing logic
+        run: |
+          mkdir -p /tmp/speedbeep-core
+          javac -d /tmp/speedbeep-core \
+            app/src/main/java/com/utk/speedbeep/RoadSegment.java \
+            app/src/main/java/com/utk/speedbeep/GeoMatcher.java \
+            app/src/main/java/com/utk/speedbeep/CsvRoadRepository.java \
+            app/src/main/java/com/utk/speedbeep/RoadLimitEditor.java \
+            host-test/TestCore.java host-test/TestRoadLimitEditor.java
+          java -cp /tmp/speedbeep-core TestCore
+          java -cp /tmp/speedbeep-core TestRoadLimitEditor
+
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
 
