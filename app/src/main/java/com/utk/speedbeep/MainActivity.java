@@ -66,6 +66,7 @@ public final class MainActivity extends Activity {
     private List<RoadSegment> quickRoadParts = java.util.Collections.emptyList();
     private long evaluatedFixTime = -1L;
     private volatile boolean quickSaving = false;
+    private boolean startAfterLocationPermission = false;
     private final java.util.concurrent.ExecutorService editExecutor =
             java.util.concurrent.Executors.newSingleThreadExecutor();
     private static final long MAX_QUICK_FIX_AGE_MS = 30000L;
@@ -251,6 +252,7 @@ public final class MainActivity extends Activity {
 
     private void startMonitoring() {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            startAfterLocationPermission = true;
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LOCATION);
             return;
         }
@@ -448,8 +450,11 @@ public final class MainActivity extends Activity {
                             "Saved %.0f km/h on %s (%d pieces).",
                             newLimit, name, parts.size());
                     quickSavedHint.setText(saved);
-                    ((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE))
-                            .hideSoftInputFromWindow(quickLimitInput.getWindowToken(), 0);
+                    InputMethodManager keyboard =
+                            (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    if (keyboard != null) {
+                        keyboard.hideSoftInputFromWindow(quickLimitInput.getWindowToken(), 0);
+                    }
                     toast(saved);
                 });
             } catch (Exception ex) {
@@ -774,6 +779,10 @@ public final class MainActivity extends Activity {
     }
 
     private void exportCsv() {
+        if (quickSaving) {
+            toast("Finish saving the speed limit before exporting.");
+            return;
+        }
         Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("text/csv");
@@ -833,8 +842,11 @@ public final class MainActivity extends Activity {
         }
         if (requestCode == REQ_LOCATION) {
             beginQuickGps();
-            // No automatic change: the user must see the road match before saving.
             updateQuickRoadStatus();
+            // Restore the existing one-tap START flow after permission is granted.
+            boolean shouldStart = startAfterLocationPermission;
+            startAfterLocationPermission = false;
+            if (shouldStart) startMonitoring();
         } else if (requestCode == REQ_NOTIFICATIONS) startMonitoring();
     }
 
