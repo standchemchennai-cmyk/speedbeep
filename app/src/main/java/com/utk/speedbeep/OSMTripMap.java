@@ -12,6 +12,8 @@ import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Polyline;
 import org.osmdroid.views.overlay.Marker;
 import org.osmdroid.views.overlay.CopyrightOverlay;
+import org.osmdroid.events.MapEventsReceiver;
+import org.osmdroid.views.overlay.MapEventsOverlay;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.ArrayList;
@@ -22,6 +24,9 @@ public final class OSMTripMap extends MapView {
     private final List<RoadSegment> roads = new ArrayList<>();
     private final List<org.osmdroid.views.overlay.Overlay> drawn = new ArrayList<>();
     private Marker position;
+    private final List<Marker> editMarkers = new ArrayList<>();
+    public interface PointTapListener { void onPoint(double latitude, double longitude); }
+    private PointTapListener pointTapListener;
     private long lastLogLength = -1;
     public OSMTripMap(Context context) {
         super(context);
@@ -32,7 +37,36 @@ public final class OSMTripMap extends MapView {
         setTilesScaledToDpi(true);
         getController().setZoom(13.0);
         getController().setCenter(new GeoPoint(12.93,80.20));
+        getOverlays().add(new MapEventsOverlay(new MapEventsReceiver() {
+            @Override public boolean singleTapConfirmedHelper(GeoPoint point) {
+                if (pointTapListener == null) return false;
+                pointTapListener.onPoint(point.getLatitude(), point.getLongitude());
+                return true;
+            }
+            @Override public boolean longPressHelper(GeoPoint point) { return false; }
+        }));
         getOverlays().add(new CopyrightOverlay(context));
+    }
+    public void setPointTapListener(PointTapListener listener) {
+        pointTapListener = listener;
+    }
+    public void centerOn(double latitude, double longitude) {
+        getController().setZoom(17.0);
+        getController().setCenter(new GeoPoint(latitude, longitude));
+    }
+    public void markEditPoint(double latitude, double longitude, String title) {
+        Marker marker = new Marker(this);
+        marker.setPosition(new GeoPoint(latitude, longitude));
+        marker.setTitle(title);
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+        editMarkers.add(marker);
+        getOverlays().add(marker);
+        invalidate();
+    }
+    public void clearEditPoints() {
+        getOverlays().removeAll(editMarkers);
+        editMarkers.clear();
+        invalidate();
     }
     public void setRoads(List<RoadSegment> list) {
         roads.clear();roads.addAll(list);
