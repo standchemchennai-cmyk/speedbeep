@@ -34,6 +34,41 @@ In the app, tap **Alarm Sound**, choose **Beep beep**, **Siren**, or **Voice: Sp
 
 As before, all overspeed warnings require an adequately accurate GPS fix and the existing 2-second hold. They repeat at 4-second intervals until you slow down.
 
+## Set or override a road limit on your phone
+
+While **parked**, use **SET SPEED LIMIT ON MY CURRENT ROAD**. Start monitoring
+first to obtain a recent GPS fix (within 10 minutes and accurate to 35 metres),
+then tap the new button. Check the detected road and its displayed length.
+
+- **Entire road** updates every *connected, same-named stretch present in the
+  local CSV*, including consecutive OpenStreetMap way fragments, not unrelated
+  streets with the same name.
+- **This piece** changes only the GPS-matched CSV straight-line segment.
+- **SELECT A STRETCH ON MAP (SPLIT EXISTING LIMIT)** lets you tap the start
+  and end *within the same configured straight segment*. The app snaps both
+  taps onto that segment, assigns your new speed to the selected middle part,
+  and preserves the old speed on the unaffected portions before and after it.
+- If both selected map endpoints are **unmapped**, the app can create a new
+  straight-line limit segment. For bends, draw several short sections. If the
+  endpoints belong to different mapped pieces, use the entire-road operation
+  or mark each smaller section separately.
+
+The editor cuts overlapping collinear segments, rather than wiping a longer
+road's speed limit. It avoids clipping perpendicular intersections or separate
+parallel carriageways. Manual changes appear as `Custom: <road>` in the
+local CSV and take priority over the older OSM limits on the modified stretch.
+
+Edits are saved **on this phone** to the app's private `speed_limits.csv`. The
+monitoring service reloads them immediately if it is running. Export the
+current CSV to back up your work or transfer it to a different device. Changes
+do not automatically sync back to GitHub or other phones.
+
+**Scope limitation:** the offline CSV only has geometry for configured speed
+segments. The app cannot automatically infer the whole length of a completely
+unmapped street from map tiles alone. Roads without speed geometry must be
+drawn manually or imported first. Always verify posted/legal limits and the
+selected road before saving.
+
 ## CSV format
 
 ```csv
