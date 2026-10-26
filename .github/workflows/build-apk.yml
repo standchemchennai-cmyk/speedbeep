@@ -75,9 +75,11 @@ jobs:
             app/src/main/java/com/utk/speedbeep/GeoMatcher.java \
             app/src/main/java/com/utk/speedbeep/CsvRoadRepository.java \
             app/src/main/java/com/utk/speedbeep/RoadLimitEditor.java \
-            host-test/TestCore.java host-test/TestRoadLimitEditor.java
+            app/src/main/java/com/utk/speedbeep/OSMRoadNetwork.java \
+            host-test/TestCore.java host-test/TestRoadLimitEditor.java host-test/TestOSMRoadNetwork.java
           java -cp /tmp/speedbeep-core TestCore
           java -cp /tmp/speedbeep-core TestRoadLimitEditor
+          java -cp /tmp/speedbeep-core TestOSMRoadNetwork
 
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
