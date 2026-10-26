@@ -36,17 +36,20 @@ As before, all overspeed warnings require an adequately accurate GPS fix and the
 
 ## Fast main-screen speed-limit editing and export
 
-While **parked**, enter the new speed in the **km/h** box and tap
-**SET THIS ROAD**. There are no intermediate dialogs. The road name, current
-speed limit, number of connected pieces and approximate mapped length appear
-next to the control before you change anything.
+Enter the new speed in the **km/h** box and tap **SET THIS ROAD**.
+There are no intermediate dialogs and no parked-vehicle speed lock. The road
+name, current speed limit, number of connected pieces and approximate mapped
+length appear next to the control before you change anything.
 
 SpeedBeep gets a foreground GPS fix as soon as the main screen is open and
 precise location is permitted; there is no need to start the speed-monitoring
-service just to edit a limit. For safety, a fresh fix (within 30 seconds,
-30-metre accuracy or better) and a stopped vehicle are required. A mismatched
-or unmapped road is not changed; use the map selector to add unmapped geometry
-or adjust a precise piece. Do not use the controls while driving.
+service just to edit a limit. The app accepts speed-limit edits while moving
+and reloads the modified database without interrupting speed monitoring.
+It requires a recent GPS fix (within 10 seconds, accuracy of 30 metres or better),
+so an old position cannot overwrite a different road. A mismatched or unmapped
+road is not changed; use the map selector to add unmapped geometry or adjust
+a precise piece. A passenger should make edits when the vehicle is moving;
+the driver must keep attention on the road.
 
 **SET THIS ROAD** changes every *connected, same-named stretch present in the
 local CSV* and automatically overwrites its existing speed limit. It does not
