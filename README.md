@@ -34,16 +34,27 @@ In the app, tap **Alarm Sound**, choose **Beep beep**, **Siren**, or **Voice: Sp
 
 As before, all overspeed warnings require an adequately accurate GPS fix and the existing 2-second hold. They repeat at 4-second intervals until you slow down.
 
-## Set or override a road limit on your phone
+## Fast main-screen speed-limit editing and export
 
-While **parked**, use **SET SPEED LIMIT ON MY CURRENT ROAD**. Start monitoring
-first to obtain a recent GPS fix (within 10 minutes and accurate to 35 metres),
-then tap the new button. Check the detected road and its displayed length.
+While **parked**, enter the new speed in the **km/h** box and tap
+**SET THIS ROAD**. There are no intermediate dialogs. The road name, current
+speed limit, number of connected pieces and approximate mapped length appear
+next to the control before you change anything.
 
-- **Entire road** updates every *connected, same-named stretch present in the
-  local CSV*, including consecutive OpenStreetMap way fragments, not unrelated
-  streets with the same name.
-- **This piece** changes only the GPS-matched CSV straight-line segment.
+SpeedBeep gets a foreground GPS fix as soon as the main screen is open and
+precise location is permitted; there is no need to start the speed-monitoring
+service just to edit a limit. For safety, a fresh fix (within 30 seconds,
+30-metre accuracy or better) and a stopped vehicle are required. A mismatched
+or unmapped road is not changed; use the map selector to add unmapped geometry
+or adjust a precise piece. Do not use the controls while driving.
+
+**SET THIS ROAD** changes every *connected, same-named stretch present in the
+local CSV* and automatically overwrites its existing speed limit. It does not
+change unrelated roads with the same name. The more detailed options remain
+available further down the screen:
+
+- **ADVANCED: ENTIRE ROAD OR ONE SEGMENT** offers a choice of the full connected
+  road or only the straight segment matched by GPS.
 - **SELECT A STRETCH ON MAP (SPLIT EXISTING LIMIT)** lets you tap the start
   and end *within the same configured straight segment*. The app snaps both
   taps onto that segment, assigns your new speed to the selected middle part,
@@ -52,6 +63,11 @@ then tap the new button. Check the detected road and its displayed length.
   straight-line limit segment. For bends, draw several short sections. If the
   endpoints belong to different mapped pieces, use the entire-road operation
   or mark each smaller section separately.
+
+The prominent **EXPORT SPEED DATABASE** button uses Android's Save As
+file picker to export the complete, currently edited `speed_limits.csv`.
+Save it to a location of your choice for backup, spreadsheet editing or import
+on another device. It exports the complete database, not only today's edits.
 
 The editor cuts overlapping collinear segments, rather than wiping a longer
 road's speed limit. It avoids clipping perpendicular intersections or separate
