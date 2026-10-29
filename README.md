@@ -41,6 +41,15 @@ There are no intermediate dialogs and no parked-vehicle speed lock. The road
 name, current speed limit, number of connected pieces and approximate mapped
 length appear next to the control before you change anything.
 
+**Existing mapped-road edits are offline:** If the road is already in the local
+CSV, SpeedBeep uses the recent GPS fix to select a plausible saved segment,
+including normal 2–10 m (and up to 20 m depending on GPS accuracy) mapping
+offsets. It no longer makes an Overpass request simply because the saved
+segment is over 4 m from the fix. If two different roads or speed zones are
+equally plausible, it declines to auto-edit and asks you to select a precise
+map stretch or move away from the junction. This same safe target is displayed
+on the main screen before tapping the save button.
+
 SpeedBeep gets a foreground GPS fix as soon as the main screen is open and
 precise location is permitted; there is no need to start the speed-monitoring
 service just to edit a limit. The app accepts speed-limit edits while moving
