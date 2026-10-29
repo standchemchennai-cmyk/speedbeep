@@ -50,24 +50,33 @@ so an old position cannot overwrite a different road.
 
 **Automatic road creation when no speed limit is mapped:** Tap
 **SET THIS ROAD** as usual. If no near-exact matching segment is in the local
-CSV, the app requests nearby drivable road geometry from an OpenStreetMap
-Overpass API server. It uses GPS and (when available) your movement direction
+CSV, the app first requests nearby drivable road geometry from an OpenStreetMap
+Overpass API server. It uses GPS and (when available) movement direction
 to detect the current road, loads connected ways of the same street name within
-approximately 2.2 km, and stores the new speed limit on those actual mapped
-road segments, including a split of overlapping old speed-limit segments.
-No drawing on the map, extra dialog, or manual start/end markers are needed.
+approximately 2.2 km, and saves the user-entered limit along the detected geometry.
+It can split overlapping old speed-limit segments without affecting the flanks.
 
-This feature needs mobile data or Wi-Fi **when discovering a road not yet
-recorded locally**, but ordinary speed monitoring and edits to confidently
-matched existing roads remain offline. The explicit lookup sends the current
-GPS coordinates to the public Overpass service; it does not upload your CSV.
-For a street with no name/ref, only the matched OpenStreetMap way is added.
-The 2.2-km discovery radius is not a guarantee of the entire legal speed-limit
-zone or entire city-spanning road. When map matching is ambiguous (junctions
-or nearby parallel roads), the app refuses to guess; try another GPS fix.
-The detailed map editor remains available as a fallback if OSM geometry is
-unavailable. A passenger should make edits while the vehicle is moving;
-the driver must keep attention on the road.
+**Offline fallback when Overpass is unavailable or no OSM road was found:**
+The same button now saves a **GPS-only local section** if GPS accuracy is
+10 metres or better. With a reliable moving bearing, it stores only an
+approximately 50-metre straight section. Otherwise it stores a very small
+GPS spot. Its narrow matching corridor is about 6–10 metres, plus the
+existing GPS-accuracy matching allowance. This does **not** create a
+complete road or verify its legal speed limit. The app explicitly reports
+that limited coverage; use **SELECT A STRETCH ON MAP** to mark a longer
+road manually. All local edits are saved to the phone's CSV and remain
+available offline. If GPS is too inaccurate, the app asks for a better fix.
+
+For an OSM lookup, your current coordinates are sent to the public
+Overpass service, never the local CSV. For a street without a name or
+reference, only the matched OSM way is added. The 2.2-km discovery radius
+does not guarantee the entire legal speed-limit zone. If OSM reports
+ambiguous nearby roads (junctions or parallel roads), **no GPS fallback is
+saved automatically**: try again away from the junction or manually
+select the precise stretch on the map. Public Overpass servers may be
+unavailable or overloaded; that no longer blocks a small GPS-only save.
+A passenger should make edits while the vehicle is moving; the driver
+must keep attention on the road.
 
 **SET THIS ROAD** changes every *connected, same-named stretch present in the
 local CSV* and automatically overwrites its existing speed limit. It does not
