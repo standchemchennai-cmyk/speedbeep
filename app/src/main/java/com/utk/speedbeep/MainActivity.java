@@ -378,13 +378,24 @@ public final class MainActivity extends Activity {
         // for a NEW GPS sample, and only rebuild connectivity when the seed changes.
         if (evaluatedFixTime != fix.timestamp) {
             evaluatedFixTime = fix.timestamp;
-            GeoMatcher.Match match = GeoMatcher.findBest(fix.lat, fix.lon, fix.accuracyM, cachedRoads);
-            RoadSegment candidate = match == null ? null : match.road;
-            if (candidate != quickRoadSeed) {
-                quickRoadSeed = candidate;
-                quickRoadParts = candidate == null
-                        ? java.util.Collections.emptyList()
-                        : RoadLimitEditor.connectedRoad(cachedRoads, candidate);
+            try {
+                // Show the same safe local target that SET THIS ROAD will edit.
+                // The speed-monitoring matcher may accept much wider corridors;
+                // an edit must not silently choose a nearby, different road.
+                GeoMatcher.Match match = LocalRoadEditMatcher.match(
+                        cachedRoads, fix.lat, fix.lon, fix.accuracyM);
+                RoadSegment candidate = match == null ? null : match.road;
+                if (candidate != quickRoadSeed) {
+                    quickRoadSeed = candidate;
+                    quickRoadParts = candidate == null
+                            ? java.util.Collections.emptyList()
+                            : RoadLimitEditor.connectedRoad(cachedRoads, candidate);
+                }
+            } catch (IllegalArgumentException ambiguous) {
+                quickRoadSeed = null;
+                quickRoadParts = java.util.Collections.emptyList();
+                quickRoadHint.setText(ambiguous.getMessage());
+                return;
             }
         }
         if (quickRoadSeed == null) {
