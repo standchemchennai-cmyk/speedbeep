@@ -36,8 +36,8 @@ public class TestGpsRoadFallback {
 
         // The resulting geometry can be represented in the persistent CSV format.
         String csv = String.format(java.util.Locale.US,
-                "name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph\\n" +
-                "\"%s\",%.7f,%.7f,%.7f,%.7f,60,%.1f,3\\n",
+                "name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph\n" +
+                "\"%s\",%.7f,%.7f,%.7f,%.7f,60,%.1f,3\n",
                 changed.get(0).name, changed.get(0).startLat, changed.get(0).startLon,
                 changed.get(0).endLat, changed.get(0).endLon, changed.get(0).corridorM);
         List<RoadSegment> parsed = CsvRoadRepository.read(
