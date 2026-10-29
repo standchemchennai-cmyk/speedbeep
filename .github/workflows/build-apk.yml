@@ -76,10 +76,13 @@ jobs:
             app/src/main/java/com/utk/speedbeep/CsvRoadRepository.java \
             app/src/main/java/com/utk/speedbeep/RoadLimitEditor.java \
             app/src/main/java/com/utk/speedbeep/OSMRoadNetwork.java \
-            host-test/TestCore.java host-test/TestRoadLimitEditor.java host-test/TestOSMRoadNetwork.java
+            app/src/main/java/com/utk/speedbeep/GpsRoadFallback.java \
+            host-test/TestCore.java host-test/TestRoadLimitEditor.java \
+            host-test/TestOSMRoadNetwork.java host-test/TestGpsRoadFallback.java
           java -cp /tmp/speedbeep-core TestCore
           java -cp /tmp/speedbeep-core TestRoadLimitEditor
           java -cp /tmp/speedbeep-core TestOSMRoadNetwork
+          java -cp /tmp/speedbeep-core TestGpsRoadFallback
 
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
