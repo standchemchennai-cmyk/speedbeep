@@ -41,6 +41,16 @@ public final class OverpassRoadResolver {
 
     private OverpassRoadResolver() {}
 
+    /** No configured geometry was found, but an accurate local GPS spot may be saved. */
+    public static final class RoadNotFoundException extends IOException {
+        RoadNotFoundException(String message) { super(message); }
+    }
+
+    /** Every OSM endpoint failed; a small, explicit GPS-only save can still work. */
+    public static final class LookupUnavailableException extends IOException {
+        LookupUnavailableException(String message, Throwable cause) { super(message, cause); }
+    }
+
     public static final class Result {
         public final String name;
         public final List<RoadSegment> pieces;
@@ -78,8 +88,8 @@ public final class OverpassRoadResolver {
         } catch (IllegalArgumentException ex) {
             throw new IOException(ex.getMessage(), ex);
         }
-        if (closest == null) throw new IOException(
-                "No drivable OpenStreetMap road at this GPS position. Try again with a clearer fix.");
+        if (closest == null) throw new RoadNotFoundException(
+                "No drivable OpenStreetMap road at this GPS position.");
 
         OSMRoadNetwork.Way selected = closest.way;
         List<OSMRoadNetwork.Way> collection = local;
@@ -133,8 +143,9 @@ public final class OverpassRoadResolver {
                 error = ex;
             }
         }
-        throw new IOException("OpenStreetMap road lookup unavailable. Check internet and try again.",
-                error);
+        String reason = error == null ? "unknown network failure" : error.getMessage();
+        throw new LookupUnavailableException(
+                "OpenStreetMap lookup unavailable (" + reason + ").", error);
     }
 
     private static byte[] fetch(String endpoint, String query) throws IOException {

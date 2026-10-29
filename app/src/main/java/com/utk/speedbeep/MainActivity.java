@@ -378,17 +378,28 @@ public final class MainActivity extends Activity {
         // for a NEW GPS sample, and only rebuild connectivity when the seed changes.
         if (evaluatedFixTime != fix.timestamp) {
             evaluatedFixTime = fix.timestamp;
-            GeoMatcher.Match match = GeoMatcher.findBest(fix.lat, fix.lon, fix.accuracyM, cachedRoads);
-            RoadSegment candidate = match == null ? null : match.road;
-            if (candidate != quickRoadSeed) {
-                quickRoadSeed = candidate;
-                quickRoadParts = candidate == null
-                        ? java.util.Collections.emptyList()
-                        : RoadLimitEditor.connectedRoad(cachedRoads, candidate);
+            try {
+                // Show the same safe local target that SET THIS ROAD will edit.
+                // The speed-monitoring matcher may accept much wider corridors;
+                // an edit must not silently choose a nearby, different road.
+                GeoMatcher.Match match = LocalRoadEditMatcher.match(
+                        cachedRoads, fix.lat, fix.lon, fix.accuracyM);
+                RoadSegment candidate = match == null ? null : match.road;
+                if (candidate != quickRoadSeed) {
+                    quickRoadSeed = candidate;
+                    quickRoadParts = candidate == null
+                            ? java.util.Collections.emptyList()
+                            : RoadLimitEditor.connectedRoad(cachedRoads, candidate);
+                }
+            } catch (IllegalArgumentException ambiguous) {
+                quickRoadSeed = null;
+                quickRoadParts = java.util.Collections.emptyList();
+                quickRoadHint.setText(ambiguous.getMessage());
+                return;
             }
         }
         if (quickRoadSeed == null) {
-            quickRoadHint.setText("No saved speed limit here • SET THIS ROAD can automatically identify it.");
+            quickRoadHint.setText("No saved limit here • SET THIS ROAD tries OSM, then a short GPS-only section if the lookup fails.");
         } else {
             double lengthM = 0;
             for (RoadSegment segment : quickRoadParts) lengthM += RoadLimitEditor.lengthM(segment);
@@ -437,31 +448,48 @@ public final class MainActivity extends Activity {
         editExecutor.execute(() -> {
             try {
                 List<RoadSegment> currentRoads = LocalRoadStore.load(this);
-                GeoMatcher.Match localMatch = GeoMatcher.findBest(lat, lon, 0, currentRoads);
+                // Prefer a reliable locally mapped road at the tap-time GPS fix.
+                // A 4 m cutoff was incorrect: normal OSM/GPS offsets can be
+                // 10 m or more on the same already-configured road.
+                GeoMatcher.Match localMatch = LocalRoadEditMatcher.match(
+                        currentRoads, lat, lon, accuracy);
                 String roadName;
                 String source;
                 List<RoadSegment> parts;
-                // A near-exact local match can be saved instantly and offline.
-                // Wider offsets might be a DIFFERENT unmapped service lane;
-                // prefer OSM road detection rather than overwriting that lane.
-                if (localMatch != null && localMatch.distanceM <= 4.0) {
+                boolean gpsOnly = false;
+                if (localMatch != null) {
                     roadName = RoadLimitEditor.baseName(localMatch.road.name);
                     parts = RoadLimitEditor.connectedRoad(currentRoads, localMatch.road);
                     source = "local road database";
                 } else {
                     // OSM contains highway geometry even where NO maxspeed tag
                     // exists. Retrieve and save it automatically on this tap.
-                    OverpassRoadResolver.Result discovered = OverpassRoadResolver.resolve(
-                            lat, lon, accuracy, hasBearing, bearing, speed);
-                    roadName = discovered.name;
-                    parts = discovered.pieces;
-                    source = discovered.extended
-                            ? "OpenStreetMap road geometry"
-                            : "OpenStreetMap way (limited coverage)";
+                    try {
+                        OverpassRoadResolver.Result discovered = OverpassRoadResolver.resolve(
+                                lat, lon, accuracy, hasBearing, bearing, speed);
+                        roadName = discovered.name;
+                        parts = discovered.pieces;
+                        source = discovered.extended
+                                ? "OpenStreetMap road geometry"
+                                : "OpenStreetMap way (limited coverage)";
+                    } catch (OverpassRoadResolver.LookupUnavailableException |
+                             OverpassRoadResolver.RoadNotFoundException unavailable) {
+                        // A failed online lookup must not make saving impossible.
+                        // Never infer a whole road from one GPS fix: save only a
+                        // narrow, short locally identified stretch, or reject a
+                        // weak GPS fix. Ambiguous OSM matches still fail safely.
+                        RoadSegment gpsPart = GpsRoadFallback.create(
+                                lat, lon, accuracy, hasBearing, bearing, speed);
+                        roadName = gpsPart.name;
+                        parts = java.util.Collections.singletonList(gpsPart);
+                        source = "local GPS-only fallback";
+                        gpsOnly = true;
+                    }
                 }
                 if (parts.isEmpty()) throw new IOException("No connected road geometry found.");
                 final String chosenRoad = roadName;
                 final String detectedFrom = source;
+                final boolean savedGpsOnly = gpsOnly;
                 final int affectedPieces = parts.size();
                 double meters = 0;
                 for (RoadSegment part : parts) meters += RoadLimitEditor.lengthM(part);
@@ -481,9 +509,14 @@ public final class MainActivity extends Activity {
                         startService(new Intent(this, SpeedMonitorService.class)
                                 .setAction(SpeedMonitorService.ACTION_RELOAD));
                     }
-                    String saved = String.format(Locale.US,
-                            "Saved %.0f km/h on %s • %.0f m (%d sections; %s).",
-                            newLimit, chosenRoad, updatedLengthM, affectedPieces, detectedFrom);
+                    String saved = savedGpsOnly
+                            ? String.format(Locale.US,
+                                    "Saved %.0f km/h in a SHORT GPS-only area (~%.0f m centreline, narrow corridor). " +
+                                    "Not the entire road. For longer coverage use SELECT A STRETCH ON MAP.",
+                                    newLimit, updatedLengthM)
+                            : String.format(Locale.US,
+                                    "Saved %.0f km/h on %s • %.0f m (%d sections; %s).",
+                                    newLimit, chosenRoad, updatedLengthM, affectedPieces, detectedFrom);
                     quickSavedHint.setText(saved);
                     InputMethodManager keyboard =
                             (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
