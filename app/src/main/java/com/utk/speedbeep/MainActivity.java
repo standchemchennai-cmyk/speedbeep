@@ -437,15 +437,16 @@ public final class MainActivity extends Activity {
         editExecutor.execute(() -> {
             try {
                 List<RoadSegment> currentRoads = LocalRoadStore.load(this);
-                GeoMatcher.Match localMatch = GeoMatcher.findBest(lat, lon, 0, currentRoads);
+                // Prefer a reliable locally mapped road at the tap-time GPS fix.
+                // A 4 m cutoff was incorrect: normal OSM/GPS offsets can be
+                // 10 m or more on the same already-configured road.
+                GeoMatcher.Match localMatch = LocalRoadEditMatcher.match(
+                        currentRoads, lat, lon, accuracy);
                 String roadName;
                 String source;
                 List<RoadSegment> parts;
                 boolean gpsOnly = false;
-                // A near-exact local match can be saved instantly and offline.
-                // Wider offsets might be a DIFFERENT unmapped service lane;
-                // prefer OSM road detection rather than overwriting that lane.
-                if (localMatch != null && localMatch.distanceM <= 4.0) {
+                if (localMatch != null) {
                     roadName = RoadLimitEditor.baseName(localMatch.road.name);
                     parts = RoadLimitEditor.connectedRoad(currentRoads, localMatch.road);
                     source = "local road database";
