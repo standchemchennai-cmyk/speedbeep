@@ -45,6 +45,9 @@ public final class MainActivity extends Activity {
     private static final int REQ_LOG_EXPORT = 202;
 
     private OSMTripMap tripMap;
+    private android.app.Dialog mapDialog;
+    private TextView mapStatusLabel;
+    private boolean followMapGps = true;
     private long lastMapReload = 0;
     private TextView bigSpeed;
     private TextView roadText;
@@ -87,6 +90,11 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Configure tile caching and identification before constructing osmdroid's MapView.
+        org.osmdroid.config.Configuration.getInstance().load(
+                getApplicationContext(), getSharedPreferences("osmdroid", MODE_PRIVATE));
+        org.osmdroid.config.Configuration.getInstance().setUserAgentValue(
+                "SpeedBeep/0.4.0 (com.utk.speedbeep)");
         setContentView(buildUi());
         refreshCsvInfo();
     }
@@ -180,12 +188,12 @@ public final class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
 
         tripMap = new OSMTripMap(this);
-        root.addView(tripMap, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(380)));
-        Button fitMap = new Button(this);
-        fitMap.setText("FIT ALL CONFIGURED ROADS");
-        fitMap.setOnClickListener(v -> tripMap.fitRoads());
-        root.addView(fitMap);
-        TextView mapHelp = label("OpenStreetMap: pinch to zoom, drag to pan. To override part of a long segment, choose SELECT A STRETCH and tap its start and end. Tiles need internet initially.", 13, false);
+        Button openMap = new Button(this);
+        openMap.setText("OPEN FULL-SCREEN MAP");
+        openMap.setOnClickListener(v -> showMapDialog());
+        root.addView(openMap, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+        TextView mapHelp = label("Full-screen OpenStreetMap: follow GPS, pinch/drag, see nearby saved road limits and edit a stretch. Internet needed for uncached tiles.", 13, false);
         root.addView(mapHelp);
 
         alarmButton = new Button(this);
@@ -586,6 +594,117 @@ public final class MainActivity extends Activity {
         }
     }
 
+
+    /** A map cannot reliably compete with the main screen's vertical ScrollView for gestures. */
+    private void showMapDialog() {
+        if (mapDialog != null && mapDialog.isShowing()) return;
+        followMapGps = !selectingMapStretch;
+        final android.app.Dialog dialog = new android.app.Dialog(
+                this, android.R.style.Theme_Material_Light_NoActionBar);
+        mapDialog = dialog;
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(8), dp(8), dp(8), dp(8));
+
+        LinearLayout heading = new LinearLayout(this);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = label("SpeedBeep Map", 22, true);
+        heading.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1));
+        Button close = new Button(this);
+        close.setText("CLOSE");
+        close.setOnClickListener(v -> dialog.dismiss());
+        heading.addView(close);
+        content.addView(heading);
+
+        // Map is attached only while visible: no map tile rendering on the speedometer screen.
+        content.addView(tripMap, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+
+        mapStatusLabel = label("Drag/pinch to explore. Green: saved roads, blue: GPS trail, red: over limit.",
+                13, false);
+        content.addView(mapStatusLabel);
+
+        LinearLayout controls = new LinearLayout(this);
+        Button follow = new Button(this);
+        follow.setText("FOLLOW GPS");
+        follow.setOnClickListener(v -> {
+            double[] fix = recentMapPosition();
+            if (fix == null) {
+                toast("Waiting for a fresh GPS position");
+                return;
+            }
+            followMapGps = true;
+            tripMap.centerOn(fix[0], fix[1]);
+            follow.setText("FOLLOWING");
+        });
+        controls.addView(follow, new LinearLayout.LayoutParams(0, dp(56), 1));
+
+        Button fit = new Button(this);
+        fit.setText("FIT ROADS");
+        fit.setOnClickListener(v -> {
+            followMapGps = false;
+            follow.setText("FOLLOW GPS");
+            tripMap.fitRoads();
+        });
+        controls.addView(fit, new LinearLayout.LayoutParams(0, dp(56), 1));
+
+        Button edit = new Button(this);
+        edit.setText("EDIT STRETCH");
+        edit.setOnClickListener(v -> chooseMapStretch());
+        controls.addView(edit, new LinearLayout.LayoutParams(0, dp(56), 1));
+        content.addView(controls);
+
+        tripMap.setOnTouchListener((v, event) -> {
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN
+                    && followMapGps && !selectingMapStretch) {
+                followMapGps = false;
+                follow.setText("FOLLOW GPS");
+            }
+            return false; // osmdroid must continue receiving all touch gestures
+        });
+
+        dialog.setOnDismissListener(d -> {
+            tripMap.onPause();
+            tripMap.setOnTouchListener(null);
+            if (tripMap.getParent() instanceof android.view.ViewGroup)
+                ((android.view.ViewGroup) tripMap.getParent()).removeView(tripMap);
+            if (selectingMapStretch) stopMapSelection();
+            mapStatusLabel = null;
+            mapDialog = null;
+        });
+        dialog.setContentView(content);
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT);
+        }
+        tripMap.onResume();
+        double[] fix = recentMapPosition();
+        if (fix != null) {
+            tripMap.setPosition(fix[0], fix[1]);
+            if (followMapGps) tripMap.centerOn(fix[0], fix[1]);
+        }
+        follow.setText(followMapGps && fix != null ? "FOLLOWING" : "FOLLOW GPS");
+        tripMap.reloadTrip();
+    }
+
+    private double[] recentMapPosition() {
+        if (latestUiLocation != null &&
+                Math.abs(System.currentTimeMillis() - latestUiLocation.getTime()) < 15000L) {
+            return new double[]{latestUiLocation.getLatitude(), latestUiLocation.getLongitude()};
+        }
+        SharedPreferences p = getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE);
+        long updated = p.getLong("updatedAt", 0L);
+        if (updated > 0 && Math.abs(System.currentTimeMillis() - updated) < 30000L) {
+            float lat = p.getFloat("latitude", Float.NaN);
+            float lon = p.getFloat("longitude", Float.NaN);
+            if (Float.isFinite(lat) && Float.isFinite(lon)) return new double[]{lat, lon};
+        }
+        return null;
+    }
+
     private void chooseMapStretch() {
         if (!editingAllowed()) return;
         if (selectingMapStretch) {
@@ -595,6 +714,9 @@ public final class MainActivity extends Activity {
         }
         selectingMapStretch = true;
         stretchStart = null;
+        followMapGps = false;
+        showMapDialog();
+        if (mapStatusLabel != null) mapStatusLabel.setText("Editing: tap START, then END of the road stretch.");
         tripMap.clearEditPoints();
         tripMap.setPointTapListener((lat, lon) -> {
             if (!selectingMapStretch) return;
@@ -605,6 +727,7 @@ public final class MainActivity extends Activity {
             } else {
                 double[] start = stretchStart;
                 stopMapSelection();
+                if (mapDialog != null) mapDialog.dismiss();
                 promptMapStretch(start[0], start[1], lat, lon);
             }
         });
@@ -620,6 +743,8 @@ public final class MainActivity extends Activity {
         stretchStart = null;
         tripMap.setPointTapListener(null);
         tripMap.clearEditPoints();
+        if (mapStatusLabel != null)
+            mapStatusLabel.setText("Drag/pinch to explore. Green: saved roads, blue: trail, red: over limit.");
     }
 
     private void promptMapStretch(double startLat, double startLon, double endLat, double endLon) {
@@ -944,12 +1069,16 @@ public final class MainActivity extends Activity {
             note = "WARNING: no GPS updates for over 15 seconds";
         }
 
-        float latitude = p.getFloat("latitude", Float.NaN);
-        float longitude = p.getFloat("longitude", Float.NaN);
-        if (!Float.isNaN(latitude) && !Float.isNaN(longitude)) tripMap.setPosition(latitude, longitude);
-        if (System.currentTimeMillis() - lastMapReload > 5000) {
-            lastMapReload = System.currentTimeMillis();
-            tripMap.reloadTrip();
+        if (mapDialog != null && mapDialog.isShowing()) {
+            double[] fix = recentMapPosition();
+            if (fix != null) {
+                tripMap.setPosition(fix[0], fix[1]);
+                if (followMapGps) tripMap.followPosition(fix[0], fix[1]);
+            }
+            if (System.currentTimeMillis() - lastMapReload > 5000) {
+                lastMapReload = System.currentTimeMillis();
+                tripMap.reloadTrip();
+            }
         }
         bigSpeed.setText(running ? String.format(Locale.US, "%.0f", speed) : "—");
         roadText.setText(road == null || road.isEmpty() ? "Road: —" : "Road: " + road);
@@ -970,17 +1099,20 @@ public final class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
-        tripMap.onResume();
+        if (mapDialog != null && mapDialog.isShowing()) tripMap.onResume();
         beginQuickGps();
         handler.post(refreshRunnable);
     }
     @Override protected void onPause() {
         handler.removeCallbacks(refreshRunnable);
         endQuickGps();
-        tripMap.onPause();
+        if (mapDialog != null && mapDialog.isShowing()) tripMap.onPause();
         super.onPause();
     }
     @Override protected void onDestroy() {
+        if (mapDialog != null) mapDialog.dismiss();
+        tripMap.dispose();
+        tripMap.onDetach();
         editExecutor.shutdown();
         super.onDestroy();
     }
