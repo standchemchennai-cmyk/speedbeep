@@ -188,6 +188,41 @@ The workflow at `.github/workflows/build-apk.yml` builds an installable Android 
 
 By default, builds use the committed offline Chennai speed-limit database; an OpenStreetMap server outage cannot block APK creation. To request new OSM limits during a manual build, enable the optional `refresh_osm` input. If OSM endpoints are unavailable, the importer keeps the existing bundled road data and proceeds with the build. GitHub Actions only retains APK artifacts for 30 days.
 
+## Android full-screen map (performance fix)
+
+Tap **OPEN FULL-SCREEN MAP** from the speedometer screen. The map is no longer
+nested inside the screen's vertical scroll area, so dragging and pinching do not
+compete with screen scrolling. It initially centers on a recent GPS position
+when one is available, otherwise it opens at the last map center (initially
+Chennai). Use **FOLLOW GPS** to recenter and track your location without
+continually resetting your zoom, **FIT ROADS** for an overview, or manually pan
+and zoom to explore.
+
+The map displays saved road geometry in green when zoomed in sufficiently,
+a bounded drive trail in blue (over-limit segments red; unknown-limit segments
+grey), and a GPS marker. The full database is still used for speed alerts;
+the map hides the green road overlay at wide zoom levels only to avoid drawing
+thousands of tiny lines. No mapped speed-limit geometry is deleted or changed.
+
+**EDIT STRETCH** (or the existing **SELECT A STRETCH ON MAP** button) enters
+two-tap mode on the full-screen map. Tap the beginning and end of the same
+configured road piece to split its limit; the existing verification and save
+dialog remains in place. Back or Close cancels selection.
+
+**Implementation:** nearby roads and the latest 4,000 trail samples are
+rendered with two canvas overlays rather than thousands of individual
+Polyline objects. Diagnostic-log parsing happens on a worker thread and
+only while the map is visible. Tiles are cached by osmdroid and still need
+internet for previously unseen areas. A failed log read preserves the
+previously displayed trail. The speed alarm, background service, CSV edit
+logic and exported database remain unchanged.
+
+**Manual phone QA before merging:** Open/close the map repeatedly; pinch/drag
+near Chennai and use Follow GPS / Fit Roads; verify speed monitoring still
+works while the map is open; check blue/red drive trace; edit a stretch and
+verify the saved road limit; test missing internet/uncached tiles and repeated
+background/foreground transitions. Run the pull-request APK CI as well.
+
 ## Local map editor
 
 Open `tools/speed_limit_editor.html` in a desktop browser.
