@@ -217,7 +217,7 @@ public final class MainActivity extends Activity {
         root.addView(currentRoadButton);
 
         Button pickStretchButton = new Button(this);
-        pickStretchButton.setText("SELECT A STRETCH ON MAP (SPLIT EXISTING LIMIT)");
+        pickStretchButton.setText("SELECT A STRETCH ON MAP (SNAP TO ROAD)");
         pickStretchButton.setOnClickListener(v -> chooseMapStretch());
         root.addView(pickStretchButton);
 
