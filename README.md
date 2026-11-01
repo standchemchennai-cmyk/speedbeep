@@ -223,6 +223,32 @@ works while the map is open; check blue/red drive trace; edit a stretch and
 verify the saved road limit; test missing internet/uncached tiles and repeated
 background/foreground transitions. Run the pull-request APK CI as well.
 
+## Map stretch snapping and curves (0.4.3)
+
+**EDIT STRETCH** now snaps the two taps to the closest local speed-limit road
+pieces and follows the connected road's actual corners rather than saving a
+straight shortcut. A bright orange preview appears on the map before the
+speed-limit confirmation. Check the selected geometry carefully, especially
+at junctions or divided carriageways. The editor applies one verified speed
+limit to the selected stretch only; the unaffected ends of earlier limits are
+preserved. Edits must be made while safely parked or by a passenger.
+
+The local CSV only contains roads where a speed limit has been recorded.
+If it does not contain a connected route, SpeedBeep requests drivable road
+geometry from OpenStreetMap Overpass in the tapped area. OSM road geometry
+is not a legal speed-limit source: the new limit input starts empty and
+requires a verified value. When offline or when road geometry is missing,
+disconnected or ambiguous, the editor explicitly declines to save instead
+of silently drawing a straight road. Tap both ends on the same street,
+ideally away from crossings, and keep each edit under four kilometres.
+
+After selecting the second point, SpeedBeep computes on a worker thread,
+previews the connected route in orange and asks for the speed limit.
+Cancel leaves the map open for another attempt. No road-limit CSV changes
+are made until Save. On-device QA: L-shaped roads, multiple bends, a
+straight portion, different-name junctions, unmapped roads with and without
+internet, and opening/closing the map repeatedly.
+
 ## Local map editor
 
 Open `tools/speed_limit_editor.html` in a desktop browser.
