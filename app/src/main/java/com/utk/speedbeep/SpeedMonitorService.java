@@ -31,6 +31,8 @@ public final class SpeedMonitorService extends Service implements LocationListen
     public static final String PREFS = "speedbeep_status";
 
     public static final String SETTINGS = "speedbeep_settings";
+    public static final String KEY_UNIVERSAL_ENABLED = "universal_enabled";
+    public static final String KEY_UNIVERSAL_KPH = "universal_kph";
     private static final int NOTIFICATION_ID = 3141;
     private static final String CHANNEL_ID = "speed_monitor";
     private static final long LOCATION_INTERVAL_MS = 1000L;
@@ -46,6 +48,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
     private long lastBeepMs = 0L;
     private long lastNotificationUpdateMs = 0L;
     private long lastLogMs = 0L;
+    private SpeedLimitPolicy.Decision activeLimit = SpeedLimitPolicy.none();
 
     @Override
     public void onCreate() {
@@ -143,62 +146,75 @@ public final class SpeedMonitorService extends Service implements LocationListen
         GeoMatcher.Match match = GeoMatcher.findBest(
                 location.getLatitude(), location.getLongitude(), accuracy, roads);
         RoadSegment road = match == null ? null : match.road;
+        SharedPreferences settings = getSharedPreferences(SETTINGS, MODE_PRIVATE);
+        boolean fallbackEnabled = settings.getBoolean("fallback_enabled", false);
+        float fallbackLimit = settings.getFloat("fallback_kph", 40f);
+        float fallbackMargin = settings.getFloat("fallback_margin", 3f);
+        boolean universalEnabled = settings.getBoolean(KEY_UNIVERSAL_ENABLED, false);
+        float universalLimit = settings.getFloat(KEY_UNIVERSAL_KPH, 60f);
 
-        if (road != currentRoad && (road == null || currentRoad == null || road.limitKph != currentRoad.limitKph || road.marginKph != currentRoad.marginKph)) {
-            currentRoad = road;
-            resetOverspeed();
-        }
+        SpeedLimitPolicy.Decision selected = SpeedLimitPolicy.select(
+                road == null ? null : road.limitKph,
+                road == null ? 0 : road.marginKph,
+                fallbackEnabled, fallbackLimit, fallbackMargin,
+                universalEnabled, universalLimit);
 
-        if (road == null) {
-            SharedPreferences settings = getSharedPreferences(SETTINGS, MODE_PRIVATE);
-            boolean fallback = settings.getBoolean("fallback_enabled", false);
-            float defaultLimit = settings.getFloat("fallback_kph", 40f);
-            float defaultMargin = settings.getFloat("fallback_margin", 3f);
-            if (fallback) {
-                long now = SystemClock.elapsedRealtime();
-                if (speedKph > defaultLimit + defaultMargin) {
-                    if (overLimitSinceMs == 0) overLimitSinceMs = now;
-                    if (now - overLimitSinceMs >= OVER_LIMIT_HOLD_MS && now - lastBeepMs >= BEEP_REPEAT_MS) {
-                        alarmPlayer.play(AlarmSoundPlayer.getSelectedMode(this), defaultLimit, true);
-                        lastBeepMs = now;
-                    }
-                } else resetOverspeed();
-                RoadSegment virtual = new RoadSegment("Unmapped road (user default)",
-                        location.getLatitude(), location.getLongitude(),
-                        location.getLatitude(), location.getLongitude(),
-                        defaultLimit, 40, defaultMargin);
-                logSample(location, speedKph, accuracy, "FALLBACK", virtual, 0);
-                writeStatus(true, speedKph, virtual, 0, accuracy, "User fallback limit, not verified legal limit");
-                maybeUpdateNotification(speedKph, virtual, "User fallback");
-                return;
-            }
-            resetOverspeed();
-            logSample(location, speedKph, accuracy, "NO_ROAD", null, 0);
-            writeStatus(true, speedKph, null, 0, accuracy, "No configured road here");
-            maybeUpdateNotification(speedKph, null, "No configured road");
-            return;
-        }
+        // Reset hold/repeat when the actual winning alert threshold changes,
+        // not merely when the named road changes. One alarm at a time.
+        if (!selected.sameAlarmAs(activeLimit)) resetOverspeed();
+        activeLimit = selected;
+        currentRoad = road;
 
-        logSample(location, speedKph, accuracy, "MATCHED", road, match.distanceM);
-        double threshold = road.limitKph + road.marginKph;
-        boolean over = speedKph > threshold;
+        final boolean over = selected.isOver(speedKph);
         long now = SystemClock.elapsedRealtime();
-
         if (over) {
-            if (overLimitSinceMs == 0L) overLimitSinceMs = now;
-            if (now - overLimitSinceMs >= OVER_LIMIT_HOLD_MS && now - lastBeepMs >= BEEP_REPEAT_MS) {
-                alarmPlayer.play(AlarmSoundPlayer.getSelectedMode(this), road.limitKph, false);
+            if (overLimitSinceMs == 0) overLimitSinceMs = now;
+            if (now - overLimitSinceMs >= OVER_LIMIT_HOLD_MS &&
+                    now - lastBeepMs >= BEEP_REPEAT_MS) {
+                String sound = AlarmSoundPlayer.getSelectedMode(this);
+                if (selected.source == SpeedLimitPolicy.Source.UNIVERSAL) {
+                    alarmPlayer.playUniversal(sound, selected.limitKph);
+                } else {
+                    alarmPlayer.play(sound, selected.limitKph,
+                            selected.source == SpeedLimitPolicy.Source.FALLBACK);
+                }
                 lastBeepMs = now;
             }
         } else {
-            resetOverspeed();
+            // Keep the last beep cooldown within a continuous monitoring session
+            // so noisy GPS near the threshold cannot produce repeated beeps.
+            overLimitSinceMs = 0;
         }
 
-        String note = over
-                ? String.format(Locale.US, "Over %.0f + %.0f margin", road.limitKph, road.marginKph)
-                : "Monitoring";
-        writeStatus(true, speedKph, road, match.distanceM, accuracy, note);
-        maybeUpdateNotification(speedKph, road, note);
+        RoadSegment displayedRoad = road;
+        if (road == null && fallbackEnabled && selected.source != SpeedLimitPolicy.Source.NONE) {
+            // Preserve the existing fallback label in the UI/log only if enabled.
+            displayedRoad = new RoadSegment("Unmapped road (user default)",
+                    location.getLatitude(), location.getLongitude(),
+                    location.getLatitude(), location.getLongitude(),
+                    fallbackLimit, 40, fallbackMargin);
+        }
+
+        String note;
+        if (selected.source == SpeedLimitPolicy.Source.UNIVERSAL) {
+            note = over
+                    ? String.format(Locale.US, "Over universal ceiling %.0f km/h", selected.limitKph)
+                    : String.format(Locale.US, "Universal ceiling %.0f km/h active", selected.limitKph);
+        } else if (selected.source == SpeedLimitPolicy.Source.ROAD) {
+            note = over ? String.format(Locale.US, "Over %.0f + %.0f margin",
+                    selected.limitKph, road.marginKph) : "Monitoring";
+        } else if (selected.source == SpeedLimitPolicy.Source.FALLBACK) {
+            note = "User fallback limit, not verified legal limit";
+        } else {
+            note = "No configured road here";
+        }
+        String result = road != null ? "MATCHED"
+                : fallbackEnabled ? "FALLBACK" : "NO_ROAD";
+        logSample(location, speedKph, accuracy, result, displayedRoad,
+                match == null ? 0 : match.distanceM);
+        writeStatus(true, speedKph, displayedRoad,
+                match == null ? 0 : match.distanceM, accuracy, note);
+        maybeUpdateNotification(speedKph, displayedRoad, note);
     }
 
     private void logSample(Location location, double speed, float accuracy, String result, RoadSegment road, double distance) {
@@ -219,6 +235,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
     private void resetOverspeed() {
         overLimitSinceMs = 0L;
         lastBeepMs = 0L;
+        activeLimit = SpeedLimitPolicy.none();
     }
 
     private void maybeUpdateNotification(double speedKph, RoadSegment road, String note) {
@@ -227,7 +244,10 @@ public final class SpeedMonitorService extends Service implements LocationListen
         lastNotificationUpdateMs = now;
 
         String text;
-        if (road == null) {
+        if (activeLimit.source == SpeedLimitPolicy.Source.UNIVERSAL) {
+            text = String.format(Locale.US, "%.0f km/h • universal cap %.0f km/h",
+                    speedKph, activeLimit.limitKph);
+        } else if (road == null) {
             text = String.format(Locale.US, "%.0f km/h • %s", speedKph, note);
         } else {
             text = String.format(Locale.US, "%.0f km/h • limit %.0f • %s", speedKph, road.limitKph, road.name);
@@ -284,6 +304,9 @@ public final class SpeedMonitorService extends Service implements LocationListen
         e.putFloat("distanceM", (float) distanceM);
         e.putFloat("accuracyM", accuracyM);
         e.putString("note", note == null ? "" : note);
+        e.putString("effectiveSource", activeLimit.source.name());
+        e.putFloat("effectiveThresholdKph", (float) activeLimit.thresholdKph);
+        e.putFloat("effectiveLimitKph", (float) activeLimit.limitKph);
         e.putLong("updatedAt", System.currentTimeMillis());
         e.apply();
     }
