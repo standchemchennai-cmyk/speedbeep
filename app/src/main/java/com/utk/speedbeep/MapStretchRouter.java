@@ -229,7 +229,9 @@ public final class MapStretchRouter {
     }
 
     private static void addLink(List<List<Step>> graph, int a, int b, RoadSegment piece) {
-        if (a == b || RoadLimitEditor.lengthM(piece) < .01) return;
+        // Keep zero-length links to virtual tap nodes. A tap exactly on a road
+        // vertex must be able to enter the graph without taking a detour.
+        if (a == b) return;
         graph.get(a).add(new Step(b, piece));
         graph.get(b).add(new Step(a, part(piece, piece.endLat, piece.endLon,
                 piece.startLat, piece.startLon)));
