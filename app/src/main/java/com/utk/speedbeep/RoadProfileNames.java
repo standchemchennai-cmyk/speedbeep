@@ -13,7 +13,7 @@ public final class RoadProfileNames {
         if (name.isEmpty() || name.length() > 48)
             throw new IllegalArgumentException("Profile name must have 1–48 characters");
         if (name.indexOf('/') >= 0 || name.indexOf((char) 92) >= 0 ||
-        if (name.indexOf(':') >= 0 || name.indexOf('\n') >= 0 ||
+                name.indexOf(':') >= 0 || name.indexOf('\n') >= 0 ||
                 name.indexOf('\r') >= 0)
             throw new IllegalArgumentException("Profile name cannot contain path characters");
         return name;
