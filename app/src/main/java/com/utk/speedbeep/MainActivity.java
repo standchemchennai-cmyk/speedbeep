@@ -43,6 +43,7 @@ public final class MainActivity extends Activity {
     private static final int REQ_IMPORT = 200;
     private static final int REQ_EXPORT = 201;
     private static final int REQ_LOG_EXPORT = 202;
+    private static final int REQ_IMPORT_NEW_PROFILE = 203;
 
     private OSMTripMap tripMap;
     private android.app.Dialog mapDialog;
@@ -55,6 +56,10 @@ public final class MainActivity extends Activity {
     private TextView universalStatusText;
     private TextView detailText;
     private TextView csvText;
+    private TextView activeProfileText;
+    private String pendingImportProfileId;
+    private String pendingImportNewName;
+    private String pendingExportProfileId;
     private Button startButton;
     private Button stopButton;
     private Button alarmButton;
@@ -190,8 +195,16 @@ public final class MainActivity extends Activity {
         quickSavedHint = label("Uses your live GPS road match. Save only verified speed limits.", 13, false);
         root.addView(quickSavedHint);
 
+        activeProfileText = label("Active CSV: checking…", 19, true);
+        root.addView(activeProfileText);
+        Button profiles = new Button(this);
+        profiles.setText("SELECT / MANAGE CSV PROFILES");
+        profiles.setOnClickListener(v -> showProfileManager());
+        root.addView(profiles, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
         Button exportButton = new Button(this);
-        exportButton.setText("EXPORT SPEED DATABASE");
+        exportButton.setText("EXPORT ACTIVE CSV");
         exportButton.setOnClickListener(v -> exportCsv());
         root.addView(exportButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
@@ -463,6 +476,15 @@ public final class MainActivity extends Activity {
         quickSaving = true;
         quickSetButton.setEnabled(false);
         quickSavedHint.setText("Detecting road and saving limit…");
+        final String editProfileId;
+        try {
+            editProfileId = RoadProfileStore.activeId(this);
+        } catch (IOException ex) {
+            quickSaving = false;
+            quickSetButton.setEnabled(true);
+            toast("CSV profile error: " + ex.getMessage());
+            return;
+        }
         final double lat = fix.lat, lon = fix.lon;
         final float accuracy = fix.accuracyM;
         final boolean hasBearing = fix.hasBearing;
@@ -471,7 +493,7 @@ public final class MainActivity extends Activity {
 
         editExecutor.execute(() -> {
             try {
-                List<RoadSegment> currentRoads = LocalRoadStore.load(this);
+                List<RoadSegment> currentRoads = LocalRoadStore.loadForProfile(this, editProfileId);
                 // Prefer a reliable locally mapped road at the tap-time GPS fix.
                 // A 4 m cutoff was incorrect: normal OSM/GPS offsets can be
                 // 10 m or more on the same already-configured road.
@@ -521,7 +543,7 @@ public final class MainActivity extends Activity {
 
                 List<RoadSegment> updated = RoadLimitEditor.override(
                         currentRoads, parts, newLimit, roadName);
-                LocalRoadStore.save(this, updated);
+                LocalRoadStore.saveForProfile(this, editProfileId, updated);
                 runOnUiThread(() -> {
                     quickSaving = false;
                     quickSetButton.setEnabled(true);
@@ -1244,11 +1266,221 @@ public final class MainActivity extends Activity {
         catch(IOException ex) { toast("Save failed: "+ex.getMessage()); return false; }
     }
 
-    private void chooseCsv() {
+    private void showProfileManager() {
+        if (quickSaving) {
+            toast("Finish the current road save before switching CSV profiles");
+            return;
+        }
+        final List<RoadProfileStore.Profile> profiles;
+        final String activeId;
+        try {
+            profiles = RoadProfileStore.list(this);
+            activeId = RoadProfileStore.activeId(this);
+        } catch (IOException ex) {
+            toast("Cannot open CSV profiles: " + ex.getMessage());
+            return;
+        }
+        if (profiles.isEmpty()) {
+            toast("No road CSV profiles found");
+            return;
+        }
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(16), dp(8), dp(16), dp(8));
+        TextView note = label("Each profile has its own road-limit CSV. Select the driver or vehicle " +
+                "before starting your trip. Universal and unmapped-road settings remain app-wide.", 14, false);
+        layout.addView(note);
+
+        android.widget.Spinner picker = new android.widget.Spinner(this);
+        List<String> choices = new ArrayList<>();
+        int activeIndex = 0;
+        for (int i = 0; i < profiles.size(); i++) {
+            RoadProfileStore.Profile profile = profiles.get(i);
+            if (profile.id.equals(activeId)) activeIndex = i;
+            choices.add(profile.name + (profile.id.equals(activeId) ? "  ✓ ACTIVE" : ""));
+        }
+        android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, choices);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        picker.setAdapter(adapter);
+        picker.setSelection(activeIndex);
+        layout.addView(picker);
+
+        TextView info = label("Tap USE SELECTED to activate. Import replaces only the active CSV. " +
+                "Use IMPORT NEW for a separate copy.", 13, false);
+        layout.addView(info);
+
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("CSV Profiles")
+                .setView(layout)
+                .setNegativeButton("Close", null)
+                .create();
+
+        LinearLayout line1 = new LinearLayout(this);
+        addProfileAction(line1, "USE SELECTED", () -> {
+            try {
+                String id = profiles.get(picker.getSelectedItemPosition()).id;
+                if (id.equals(RoadProfileStore.activeId(this))) {
+                    toast("This CSV is already active");
+                    return;
+                }
+                RoadProfileStore.select(this, id);
+                refreshCsvInfo();
+                reloadLiveRoads();
+                dialog.dismiss();
+                toast("Using CSV: " + RoadProfileStore.active(this).name);
+            } catch (Exception ex) {
+                toast("Could not switch CSV: " + ex.getMessage());
+            }
+        });
+        addProfileAction(line1, "COPY SELECTED", () -> {
+            RoadProfileStore.Profile source = profiles.get(picker.getSelectedItemPosition());
+            dialog.dismiss();
+            askProfileName("Copy CSV profile", source.name + " copy", name -> {
+                RoadProfileStore.Profile copied = RoadProfileStore.duplicate(
+                        this, source.id, name);
+                toast("Created independent CSV: " + copied.name);
+                showProfileManager();
+            });
+        });
+        layout.addView(line1);
+
+        LinearLayout line2 = new LinearLayout(this);
+        addProfileAction(line2, "IMPORT NEW", () -> {
+            dialog.dismiss();
+            askProfileName("Import as a new CSV profile", "", name -> {
+                pendingImportNewName = name;
+                openCsvPicker(REQ_IMPORT_NEW_PROFILE);
+            });
+        });
+        addProfileAction(line2, "RENAME", () -> {
+            RoadProfileStore.Profile selected = profiles.get(picker.getSelectedItemPosition());
+            dialog.dismiss();
+            askProfileName("Rename CSV profile", selected.name, name -> {
+                RoadProfileStore.rename(this, selected.id, name);
+                refreshCsvInfo();
+                showProfileManager();
+            });
+        });
+        layout.addView(line2);
+
+        LinearLayout line3 = new LinearLayout(this);
+        addProfileAction(line3, "SHARE CSV", () -> {
+            try {
+                RoadProfileStore.Profile selected = profiles.get(picker.getSelectedItemPosition());
+                shareRoadProfile(selected);
+            } catch (Exception ex) {
+                toast("Cannot share CSV: " + ex.getMessage());
+            }
+        });
+        addProfileAction(line3, "DELETE", () -> {
+            RoadProfileStore.Profile selected = profiles.get(picker.getSelectedItemPosition());
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete CSV profile?")
+                    .setMessage("Delete \"" + selected.name +
+                            "\" and its saved road limits from this phone? " +
+                            "This cannot be undone. The active CSV cannot be deleted.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Delete", (d, w) -> {
+                        try {
+                            RoadProfileStore.delete(this, selected.id);
+                            dialog.dismiss();
+                            toast("Deleted profile: " + selected.name);
+                            showProfileManager();
+                        } catch (Exception ex) {
+                            toast("Cannot delete: " + ex.getMessage());
+                        }
+                    }).show();
+        });
+        layout.addView(line3);
+        dialog.show();
+    }
+
+    private void addProfileAction(LinearLayout row, String caption, Runnable action) {
+        Button button = new Button(this);
+        button.setText(caption);
+        button.setTextSize(12);
+        button.setOnClickListener(v -> action.run());
+        row.addView(button, new LinearLayout.LayoutParams(0, dp(55), 1));
+    }
+
+    private interface ProfileNameAction {
+        void accept(String name) throws IOException;
+    }
+
+    private void askProfileName(String title, String defaultName, ProfileNameAction action) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Profile name, e.g. Thar / Driver");
+        input.setText(defaultName);
+        input.setSelectAllOnFocus(true);
+        LinearLayout box = new LinearLayout(this);
+        box.setPadding(dp(20), dp(4), dp(20), dp(4));
+        box.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(box)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Continue", null)
+                .create();
+        dialog.setOnShowListener(d ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    try {
+                        String value = RoadProfileNames.checked(input.getText().toString());
+                        action.accept(value);
+                        dialog.dismiss();
+                    } catch (Exception ex) {
+                        input.setError(ex.getMessage());
+                    }
+                }));
+        dialog.show();
+    }
+
+    private void shareRoadProfile(RoadProfileStore.Profile profile) throws IOException {
+        java.io.File file = RoadProfileStore.fileFor(this, profile.id);
+        Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                this, getPackageName() + ".fileprovider", file);
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/csv");
+        send.putExtra(Intent.EXTRA_STREAM, uri);
+        send.putExtra(Intent.EXTRA_SUBJECT, "SpeedBeep CSV: " + profile.name);
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        send.setClipData(android.content.ClipData.newRawUri("SpeedBeep road limits", uri));
+        startActivity(Intent.createChooser(send, "Share " + profile.name + " CSV"));
+    }
+
+    private void reloadLiveRoads() {
+        if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE)
+                .getBoolean("running", false)) {
+            startService(new Intent(this, SpeedMonitorService.class)
+                    .setAction(SpeedMonitorService.ACTION_RELOAD));
+        }
+    }
+
+    private void openCsvPicker(int requestCode) {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
-        i.setType("*/*");
-        startActivityForResult(i, REQ_IMPORT);
+        i.setType("text/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[]{"text/csv", "text/plain", "application/vnd.ms-excel",
+                        "application/octet-stream"});
+        startActivityForResult(i, requestCode);
+    }
+
+    private void chooseCsv() {
+        if (quickSaving) {
+            toast("Finish saving the road limit first");
+            return;
+        }
+        try {
+            pendingImportProfileId = RoadProfileStore.activeId(this);
+            openCsvPicker(REQ_IMPORT);
+        } catch (IOException ex) {
+            toast("CSV profile error: " + ex.getMessage());
+        }
     }
 
     private void exportCsv() {
@@ -1259,7 +1491,15 @@ public final class MainActivity extends Activity {
         Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("text/csv");
-        i.putExtra(Intent.EXTRA_TITLE, "speed_limits.csv");
+        try {
+            RoadProfileStore.Profile profile = RoadProfileStore.active(this);
+            pendingExportProfileId = profile.id;
+            String safe = profile.name.replaceAll("[^a-zA-Z0-9_-]", "_");
+            i.putExtra(Intent.EXTRA_TITLE, "speedbeep_" + safe + ".csv");
+        } catch (IOException ex) {
+            toast("CSV profile error: " + ex.getMessage());
+            return;
+        }
         startActivityForResult(i, REQ_EXPORT);
     }
 
