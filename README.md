@@ -287,6 +287,53 @@ unmapped road with fallback off and on, change universal while monitoring
 and verify the foreground notification's effective threshold. Confirm
 all existing speed/alarm modes remain functional.
 
+## Multiple CSV profiles and sharing (0.4.6)
+
+Open **SELECT / MANAGE CSV PROFILES** to maintain separate road-limit
+databases for different vehicles and driving arrangements, such as
+"XL6 — self drive", "Thar — driver" and "Family car". You may:
+
+- **USE SELECTED**: switch the active road database; SpeedBeep reloads its
+  matching and alarms immediately when monitoring is running.
+- **COPY SELECTED**: duplicate a profile for independent editing. Future edits
+  apply only to that copy; there is no shared CSV behind the scenes.
+- **IMPORT NEW**: pick a CSV on your phone and give it a unique name. The
+  imported file becomes its own profile and is activated.
+- **RENAME**: change a profile's display name without changing its CSV.
+- **SHARE CSV**: send the selected profile's actual `.csv` through Android's
+  Share Sheet (WhatsApp, email, Drive, Nearby Share, etc.). The recipient can
+  import it as a new profile in their copy of SpeedBeep. Sharing sends a
+  snapshot, **not** a live-synced file; future edits will not automatically
+  propagate to other devices.
+- **DELETE**: delete an inactive profile and its local CSV after confirmation.
+  You cannot delete the active profile without switching away first.
+
+The old pre-upgrade `speed_limits.csv` is **copied without modification**
+into the initial **Default roads** profile on first use; the original legacy
+file is retained in app-private storage for recovery. Existing manual speed
+edits survive migration. New files are stored privately under
+`files/road_profiles/` with opaque UUID file names. CSV imports are
+validated and profile edits are written atomically to avoid partial writes.
+
+The main screen always displays **Active CSV: <profile name>**. Ordinary
+**IMPORT CSV** replaces only the currently active profile, and **EXPORT
+ACTIVE CSV** exports the active profile under a descriptive filename.
+The separate universal ceiling, fallback limit, alarm tone and GPS permission
+are still **app-wide**, not per-profile; profiles currently contain **road
+segments only**.
+
+For security, sharing uses a temporary read-only Android FileProvider URI;
+the app does not upload CSVs or create any account. Road profiles remain on
+this device unless you explicitly export or share them.
+
+**QA:** Upgrade an existing 0.4.5 install with local edits and confirm the
+default CSV matches; copy to a second profile and edit a limit; switch back
+and ensure original unchanged; switch profiles while monitoring; import a
+third CSV and test matching; share an inactive CSV; verify the recipient
+can import it; try a bad CSV (must not overwrite anything); reject deleting
+active profile; check restart persistence. Universal limit should remain
+unchanged when switching CSVs.
+
 ## Local map editor
 
 Open `tools/speed_limit_editor.html` in a desktop browser.
