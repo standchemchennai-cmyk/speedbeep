@@ -257,6 +257,36 @@ intermediate corners and save, (4) undo a point / cancel / reopen, (5) confirm
 speed limits on the curved sections after saving. **Only edit while parked
 or as a passenger.**
 
+## Universal Speed Limit (0.4.5)
+
+Open **UNIVERSAL SPEED LIMIT** in the SpeedBeep app. Enable the toggle and
+choose a personal ceiling in km/h (5–200). It is **off by default** and
+stored independently of the unmapped-road fallback and the road-specific
+CSV. Settings take effect on the next valid GPS fix, without restarting
+monitoring. The main screen shows the configured universal ceiling, and
+the monitoring status shows which alarm threshold actually wins.
+
+The universal ceiling is a *personal overspeed alert*, not a claim about
+the legal limit of any road. On reliable GPS fixes, it applies whether the
+road is matched, unmatched, or an unmapped fallback is in use. It has no
+additional speed margin: e.g., if set to 60 km/h, the app begins its
+overspeed hold when measured GPS speed exceeds 60. The existing 2-second
+hold and 4-second repeat remain, so it is not a hard speed governor.
+
+**The most restrictive alert wins**: a matched road with a 40 km/h limit
+and 3 km/h margin will still warn above 43 even when the universal ceiling
+is 60. Conversely a mapped 80 km/h road warns above 60 if universal is
+enabled at 60. The separate unmapped-road fallback still behaves as
+before and can be turned off independently. Only one alert sound is played
+at a time; in Voice mode a universal alarm announces "Universal speed
+limit XX". If GPS accuracy exceeds the service's safety cutoff (±60 m),
+the alarm is temporarily withheld as before, to avoid false speed alerts.
+
+Test cases: universal off, universal on with mapped lower/higher limits,
+unmapped road with fallback off and on, change universal while monitoring
+and verify the foreground notification's effective threshold. Confirm
+all existing speed/alarm modes remain functional.
+
 ## Local map editor
 
 Open `tools/speed_limit_editor.html` in a desktop browser.
