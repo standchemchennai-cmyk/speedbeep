@@ -63,11 +63,20 @@ public final class AlarmSoundPlayer {
 
     /** Uses the actual configured limit, not the driver's current GPS speed. */
     public void play(String mode, double speedLimitKph, boolean userDefault) {
+        playWithPrefix(mode, speedLimitKph,
+                userDefault ? "User set limit " : "Speed limit ");
+    }
+
+    /** Announce the separate personal ceiling in voice mode. */
+    public void playUniversal(String mode, double speedLimitKph) {
+        playWithPrefix(mode, speedLimitKph, "Universal speed limit ");
+    }
+
+    private void playWithPrefix(String mode, double speedLimitKph, String prefix) {
         if (closed) return;
         stopSiren();
         if (VOICE.equals(mode)) {
-            String words = (userDefault ? "User set limit " : "Speed limit ")
-                    + Math.round(speedLimitKph);
+            String words = prefix + Math.round(speedLimitKph);
             if (speechReady && speech != null) {
                 speak(words);
             } else {
