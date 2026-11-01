@@ -233,21 +233,29 @@ at junctions or divided carriageways. The editor applies one verified speed
 limit to the selected stretch only; the unaffected ends of earlier limits are
 preserved. Edits must be made while safely parked or by a passenger.
 
-The local CSV only contains roads where a speed limit has been recorded.
-If it does not contain a connected route, SpeedBeep requests drivable road
-geometry from OpenStreetMap Overpass in the tapped area. OSM road geometry
-is not a legal speed-limit source: the new limit input starts empty and
-requires a verified value. When offline or when road geometry is missing,
-disconnected or ambiguous, the editor explicitly declines to save instead
-of silently drawing a straight road. Tap both ends on the same street,
-ideally away from crossings, and keep each edit under four kilometres.
+**Offline-first fix (0.4.4):** The local speed-limit CSV contains only roads
+with stored limits. The first attempt still automatically snaps start/end taps
+to any matching connected CSV segments; it does **not** call OSM Overpass.
+If it cannot find a connected route, it offers **TRACE ROAD** rather than
+waiting for a slow/unavailable external server.
 
-After selecting the second point, SpeedBeep computes on a worker thread,
-previews the connected route in orange and asks for the speed limit.
-Cancel leaves the map open for another attempt. No road-limit CSV changes
-are made until Save. On-device QA: L-shaped roads, multiple bends, a
-straight portion, different-name junctions, unmapped roads with and without
-internet, and opening/closing the map repeatedly.
+For an unmapped road, tap **TRACE ROAD** on the full-screen map, then tap
+**START**, every bend (up to 150 m between points), and **END**. The orange
+line previews the complete multi-segment trace. **UNDO** deletes your last
+point; **FINISH** presents the confirmation dialog, asking for the verified
+street name and posted speed limit. **CANCEL TRACE** abandons it without
+changing the CSV. The trace does **not** automatically snap to unseen OSM
+roads or identify official speed limits; position the points carefully and
+check the orange line visually. The GPS matching corridor is narrower for
+manually traced roads to reduce interference with parallel lanes.
+
+These road edits work without an Overpass connection, including when tiles
+are already cached or offline. Limit traces to four kilometres and at most
+100 points. On-device QA: (1) snap existing connected roads, (2) fail
+automatic snapping and choose TRACE ROAD, (3) make a curved road with
+intermediate corners and save, (4) undo a point / cancel / reopen, (5) confirm
+speed limits on the curved sections after saving. **Only edit while parked
+or as a passenger.**
 
 ## Local map editor
 
