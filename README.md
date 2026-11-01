@@ -217,7 +217,7 @@ internet for previously unseen areas. A failed log read preserves the
 previously displayed trail. The speed alarm, background service, CSV edit
 logic and exported database remain unchanged.
 
-**Manual phone QA before merging:** Open/close the map repeatedly; pinch/drag
+**Map reopen regression (0.4.2):** osmdroid destroys its tile provider when an Android Dialog detaches the MapView. Because SpeedBeep reuses the same MapView on the next open, the tiles previously disappeared. This version disables automatic destruction on temporary window detach and keeps explicit final cleanup in MainActivity.onDestroy(). Verify at least five consecutive open/close cycles, including zooming/panning, followed by background/foreground and opening the map again.\n\n**Manual phone QA before merging:** Open/close the map repeatedly; pinch/drag
 near Chennai and use Follow GPS / Fit Roads; verify speed monitoring still
 works while the map is open; check blue/red drive trace; edit a stretch and
 verify the saved road limit; test missing internet/uncached tiles and repeated
