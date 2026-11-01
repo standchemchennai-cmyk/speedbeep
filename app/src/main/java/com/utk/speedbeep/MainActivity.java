@@ -1506,19 +1506,42 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            if (requestCode == REQ_IMPORT) pendingImportProfileId = null;
+            if (requestCode == REQ_IMPORT_NEW_PROFILE) pendingImportNewName = null;
+            if (requestCode == REQ_EXPORT) pendingExportProfileId = null;
+            return;
+        }
         Uri uri = data.getData();
         if (requestCode == REQ_IMPORT) {
+            String destinationId = pendingImportProfileId;
+            pendingImportProfileId = null;
             try (InputStream in = getContentResolver().openInputStream(uri)) {
-                if (in == null) throw new IOException("Could not open selected file");
-                int count = LocalRoadStore.importCsv(this, in);
-                toast("Imported " + count + " road segments");
-                refreshCsvInfo();
-                if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE).getBoolean("running", false)) {
-                    startService(new Intent(this, SpeedMonitorService.class).setAction(SpeedMonitorService.ACTION_RELOAD));
+                if (in == null || destinationId == null)
+                    throw new IOException("CSV import target unavailable");
+                int count = LocalRoadStore.importCsvForProfile(this, destinationId, in);
+                toast("Replaced " + count + " road segments in selected CSV profile");
+                if (destinationId.equals(RoadProfileStore.activeId(this))) {
+                    refreshCsvInfo();
+                    reloadLiveRoads();
                 }
             } catch (Exception ex) {
-                toast("Import failed: " + ex.getMessage());
+                toast("CSV import failed: " + ex.getMessage());
+            }
+        } else if (requestCode == REQ_IMPORT_NEW_PROFILE) {
+            String newName = pendingImportNewName;
+            pendingImportNewName = null;
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null || newName == null)
+                    throw new IOException("CSV profile name or import file missing");
+                RoadProfileStore.Profile created =
+                        RoadProfileStore.createImported(this, newName, in);
+                RoadProfileStore.select(this, created.id);
+                refreshCsvInfo();
+                reloadLiveRoads();
+                toast("Imported and activated new CSV: " + created.name);
+            } catch (Exception ex) {
+                toast("New profile import failed: " + ex.getMessage());
             }
         } else if (requestCode == REQ_LOG_EXPORT) {
             try (InputStream in = new java.io.FileInputStream(DriveLog.file(this));
@@ -1530,16 +1553,20 @@ public final class MainActivity extends Activity {
                 toast("Drive diagnostics exported");
             } catch (Exception ex) { toast("Export failed: " + ex.getMessage()); }
         } else if (requestCode == REQ_EXPORT) {
+            String id = pendingExportProfileId;
+            pendingExportProfileId = null;
             try {
-                LocalRoadStore.ensureSeedFile(this);
-                try (InputStream in = new java.io.FileInputStream(LocalRoadStore.file(this)); OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (id == null) throw new IOException("CSV export profile is missing");
+                try (InputStream in = new java.io.FileInputStream(
+                        RoadProfileStore.fileFor(this, id));
+                     OutputStream out = getContentResolver().openOutputStream(uri)) {
                     if (out == null) throw new IOException("Could not create output file");
                     byte[] buffer = new byte[8192];
                     int n;
-                    while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);
+                    while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
                     out.flush();
                 }
-                toast("CSV exported");
+                toast("Selected CSV profile exported");
             } catch (Exception ex) {
                 toast("Export failed: " + ex.getMessage());
             }
@@ -1572,8 +1599,13 @@ public final class MainActivity extends Activity {
             evaluatedFixTime = -1L;
             tripMap.setRoads(roads);
             updateQuickRoadStatus();
-            csvText.setText("CSV: " + roads.size() + " road segment" + (roads.size() == 1 ? "" : "s") + " loaded");
+            RoadProfileStore.Profile active = RoadProfileStore.active(this);
+            if (activeProfileText != null)
+                activeProfileText.setText("Active CSV: " + active.name);
+            csvText.setText(active.name + ": " + roads.size() + " road segment" +
+                    (roads.size() == 1 ? "" : "s") + " loaded");
         } catch (IOException ex) {
+            if (activeProfileText != null) activeProfileText.setText("CSV profile error");
             csvText.setText("CSV ERROR: " + ex.getMessage());
         }
     }
