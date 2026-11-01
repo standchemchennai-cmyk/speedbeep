@@ -43,6 +43,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
     private LocationManager locationManager;
     private AlarmSoundPlayer alarmPlayer;
     private List<RoadSegment> roads = Collections.emptyList();
+    private String activeProfileName = "Default roads";
     private RoadSegment currentRoad;
     private long overLimitSinceMs = 0L;
     private long lastBeepMs = 0L;
@@ -65,7 +66,9 @@ public final class SpeedMonitorService extends Service implements LocationListen
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         try {
-            roads = LocalRoadStore.load(this);
+            RoadProfileStore.Profile active = RoadProfileStore.active(this);
+            roads = LocalRoadStore.loadForProfile(this, active.id);
+            activeProfileName = active.name;
         } catch (IOException ex) {
             writeStatus(false, 0, null, 0, 0, "CSV error: " + ex.getMessage());
             stopSelf();
@@ -83,12 +86,17 @@ public final class SpeedMonitorService extends Service implements LocationListen
         }
         if (intent != null && ACTION_RELOAD.equals(intent.getAction())) {
             try {
-                roads = LocalRoadStore.load(this);
+                RoadProfileStore.Profile active = RoadProfileStore.active(this);
+                List<RoadSegment> newRoads =
+                        LocalRoadStore.loadForProfile(this, active.id);
+                // Swap only after the entire new CSV was validated and loaded.
+                roads = newRoads;
+                activeProfileName = active.name;
                 currentRoad = null;
                 resetOverspeed();
-                updateNotification("Speed-limit database updated");
+                updateNotification("CSV profile: " + activeProfileName);
             } catch (IOException ex) {
-                updateNotification("Road update failed: " + ex.getMessage());
+                updateNotification("CSV switch failed: " + ex.getMessage());
             }
         }
         return START_STICKY;
@@ -304,6 +312,7 @@ public final class SpeedMonitorService extends Service implements LocationListen
         e.putFloat("distanceM", (float) distanceM);
         e.putFloat("accuracyM", accuracyM);
         e.putString("note", note == null ? "" : note);
+        e.putString("profileName", activeProfileName);
         e.putString("effectiveSource", activeLimit.source.name());
         e.putFloat("effectiveThresholdKph", (float) activeLimit.thresholdKph);
         e.putFloat("effectiveLimitKph", (float) activeLimit.limitKph);
