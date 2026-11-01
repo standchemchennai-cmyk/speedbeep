@@ -80,10 +80,11 @@ jobs:
             app/src/main/java/com/utk/speedbeep/LocalRoadEditMatcher.java \
             app/src/main/java/com/utk/speedbeep/MapStretchRouter.java \
             app/src/main/java/com/utk/speedbeep/ManualRoadTrace.java \
+            app/src/main/java/com/utk/speedbeep/SpeedLimitPolicy.java \
             host-test/TestCore.java host-test/TestRoadLimitEditor.java \
             host-test/TestOSMRoadNetwork.java host-test/TestGpsRoadFallback.java \
             host-test/TestLocalRoadEditMatcher.java host-test/TestMapStretchRouter.java \
-            host-test/TestManualRoadTrace.java
+            host-test/TestManualRoadTrace.java host-test/TestSpeedLimitPolicy.java
           java -cp /tmp/speedbeep-core TestCore
           java -cp /tmp/speedbeep-core TestRoadLimitEditor
           java -cp /tmp/speedbeep-core TestOSMRoadNetwork
@@ -91,6 +92,7 @@ jobs:
           java -cp /tmp/speedbeep-core TestLocalRoadEditMatcher
           java -cp /tmp/speedbeep-core TestMapStretchRouter
           java -cp /tmp/speedbeep-core TestManualRoadTrace
+          java -cp /tmp/speedbeep-core TestSpeedLimitPolicy
 
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
