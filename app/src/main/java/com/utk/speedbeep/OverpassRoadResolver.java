@@ -152,7 +152,7 @@ public final class OverpassRoadResolver {
         double west = Math.min(startLon, endLon) - lonPad;
         double east = Math.max(startLon, endLon) + lonPad;
         String query = String.format(Locale.US,
-                "[out:json][timeout:25];way[\\\"highway\\\"~\\\"%s\\\"]" +
+                "[out:json][timeout:25];way[\"highway\"~\"%s\"]" +
                         "(%.7f,%.7f,%.7f,%.7f);out tags geom;",
                 MOTOR_ROADS, south, west, north, east);
         List<OSMRoadNetwork.Way> ways = request(query);
