@@ -78,6 +78,11 @@ public final class MainActivity extends Activity {
     private static final float MAX_QUICK_FIX_ACCURACY_M = 30f;
     private boolean selectingMapStretch = false;
     private double[] stretchStart;
+    private boolean manualTracing = false;
+    private final List<double[]> manualTracePoints = new ArrayList<>();
+    private Button traceButton;
+    private Button traceUndoButton;
+    private Button traceFinishButton;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final Runnable refreshRunnable = new Runnable() {
@@ -655,6 +660,26 @@ public final class MainActivity extends Activity {
         controls.addView(edit, new LinearLayout.LayoutParams(0, dp(56), 1));
         content.addView(controls);
 
+        LinearLayout traceControls = new LinearLayout(this);
+        traceButton = new Button(this);
+        traceButton.setText("TRACE ROAD");
+        traceButton.setOnClickListener(v -> {
+            if (manualTracing) stopManualTrace(true);
+            else beginManualTrace();
+        });
+        traceControls.addView(traceButton, new LinearLayout.LayoutParams(0, dp(56), 1));
+        traceUndoButton = new Button(this);
+        traceUndoButton.setText("UNDO");
+        traceUndoButton.setVisibility(View.GONE);
+        traceUndoButton.setOnClickListener(v -> undoManualTracePoint());
+        traceControls.addView(traceUndoButton, new LinearLayout.LayoutParams(0, dp(56), 1));
+        traceFinishButton = new Button(this);
+        traceFinishButton.setText("FINISH");
+        traceFinishButton.setVisibility(View.GONE);
+        traceFinishButton.setOnClickListener(v -> finishManualTrace());
+        traceControls.addView(traceFinishButton, new LinearLayout.LayoutParams(0, dp(56), 1));
+        content.addView(traceControls);
+
         tripMap.setOnTouchListener((v, event) -> {
             if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN
                     && followMapGps && !selectingMapStretch) {
@@ -671,6 +696,10 @@ public final class MainActivity extends Activity {
             if (tripMap.getParent() instanceof android.view.ViewGroup)
                 ((android.view.ViewGroup) tripMap.getParent()).removeView(tripMap);
             if (selectingMapStretch) stopMapSelection();
+            if (manualTracing) stopManualTrace(true);
+            traceButton = null;
+            traceUndoButton = null;
+            traceFinishButton = null;
             mapStatusLabel = null;
             mapDialog = null;
         });
@@ -708,6 +737,7 @@ public final class MainActivity extends Activity {
 
     private void chooseMapStretch() {
         if (!editingAllowed()) return;
+        if (manualTracing) stopManualTrace(true);
         if (selectingMapStretch) {
             stopMapSelection();
             toast("Map stretch selection cancelled");
@@ -748,6 +778,113 @@ public final class MainActivity extends Activity {
             mapStatusLabel.setText("Drag/pinch to explore. Green: saved roads, blue: trail, red: over limit.");
     }
 
+    /** Add intermediate bends on any road. No network request or OSM assumption. */
+    private void beginManualTrace() {
+        if (!editingAllowed()) return;
+        if (selectingMapStretch) stopMapSelection();
+        manualTracing = true;
+        manualTracePoints.clear();
+        followMapGps = false;
+        tripMap.clearEditPoints();
+        tripMap.clearRoutePreview();
+        if (traceButton != null) traceButton.setText("CANCEL TRACE");
+        if (traceUndoButton != null) traceUndoButton.setVisibility(View.VISIBLE);
+        if (traceFinishButton != null) traceFinishButton.setVisibility(View.VISIBLE);
+        if (mapStatusLabel != null) mapStatusLabel.setText(
+                "TRACE ROAD: Tap START, each bend (within 150 m), then END. Press FINISH.");
+        tripMap.setPointTapListener((lat, lon) -> {
+            if (!manualTracing) return;
+            List<double[]> candidate = new ArrayList<>(manualTracePoints);
+            candidate.add(new double[]{lat, lon});
+            if (candidate.size() > 1) {
+                try {
+                    ManualRoadTrace.build(candidate);
+                } catch (IllegalArgumentException ex) {
+                    toast(ex.getMessage());
+                    return;
+                }
+            }
+            manualTracePoints.add(new double[]{lat, lon});
+            redrawManualTrace();
+        });
+        toast("Tap along the road: start, bends, end. Press FINISH to review. No internet required.");
+    }
+
+    private void redrawManualTrace() {
+        tripMap.clearEditPoints();
+        for (int i = 0; i < manualTracePoints.size(); i++) {
+            double[] point = manualTracePoints.get(i);
+            tripMap.markEditPoint(point[0], point[1],
+                    i == 0 ? "Road start" : "Road point " + (i + 1));
+        }
+        if (manualTracePoints.size() >= 2) {
+            ManualRoadTrace.Result route = ManualRoadTrace.build(manualTracePoints);
+            tripMap.showRoutePreview(route.pieces);
+            if (mapStatusLabel != null) mapStatusLabel.setText(String.format(Locale.US,
+                    "Orange manual trace: %d points, %.0f m. Tap next bend or press FINISH.",
+                    manualTracePoints.size(), route.lengthM));
+        } else {
+            tripMap.clearRoutePreview();
+            if (mapStatusLabel != null) mapStatusLabel.setText(
+                    "Road start marked. Tap every bend and the END (150 m maximum between taps).");
+        }
+        if (traceUndoButton != null)
+            traceUndoButton.setEnabled(!manualTracePoints.isEmpty());
+        if (traceFinishButton != null)
+            traceFinishButton.setEnabled(manualTracePoints.size() >= 2);
+    }
+
+    private void undoManualTracePoint() {
+        if (!manualTracing || manualTracePoints.isEmpty()) return;
+        manualTracePoints.remove(manualTracePoints.size() - 1);
+        redrawManualTrace();
+    }
+
+    private void stopManualTrace(boolean removePreview) {
+        manualTracing = false;
+        manualTracePoints.clear();
+        tripMap.setPointTapListener(null);
+        tripMap.clearEditPoints();
+        if (removePreview) tripMap.clearRoutePreview();
+        if (traceButton != null) traceButton.setText("TRACE ROAD");
+        if (traceUndoButton != null) traceUndoButton.setVisibility(View.GONE);
+        if (traceFinishButton != null) traceFinishButton.setVisibility(View.GONE);
+        if (mapStatusLabel != null && removePreview) mapStatusLabel.setText(
+                "Manual tracing cancelled. No road changes saved.");
+    }
+
+    private void finishManualTrace() {
+        if (!manualTracing) return;
+        final ManualRoadTrace.Result trace;
+        try {
+            trace = ManualRoadTrace.build(new ArrayList<>(manualTracePoints));
+        } catch (IllegalArgumentException ex) {
+            toast(ex.getMessage());
+            return;
+        }
+        stopManualTrace(false);
+        if (mapStatusLabel != null) mapStatusLabel.setText(String.format(Locale.US,
+                "Orange manual trace (NOT automatic OSM snap): %.0f m. Verify path before saving.",
+                trace.lengthM));
+        editExecutor.execute(() -> {
+            try {
+                List<RoadSegment> existing = LocalRoadStore.load(this);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed() ||
+                            mapDialog == null || !mapDialog.isShowing()) return;
+                    promptRoadLimit(existing, trace.pieces,
+                            "Manual road trace", true, true, true);
+                });
+            } catch (IOException ex) {
+                runOnUiThread(() -> {
+                    if (mapStatusLabel != null)
+                        mapStatusLabel.setText("Cannot load local road database: " + ex.getMessage());
+                    toast("Could not load road database: " + ex.getMessage());
+                });
+            }
+        });
+    }
+
     private void promptMapStretch(double startLat, double startLon, double endLat, double endLon) {
         // Loading and connected-graph search can be expensive; NEVER block map gestures.
         if (mapStatusLabel != null)
@@ -774,10 +911,11 @@ public final class MainActivity extends Activity {
                     candidate = MapStretchRouter.route(original,
                             startLat, startLon, endLat, endLon, false);
                 } catch (MapStretchRouter.RouteNotFoundException missing) {
-                    // Local CSV holds only roads with stored limits. Unmapped roads
-                    // need OSM way geometry; map tiles cannot be used to route.
-                    candidate = OverpassRoadResolver.routeMapStretch(
-                            startLat, startLon, endLat, endLon);
+                    // The local speed-limit CSV does not contain every street.
+                    // Do not block editing on a third-party Overpass server.
+                    // Offer immediate offline multi-point tracing instead.
+                    error = "No connected local road geometry for those taps. " +
+                            "Choose TRACE ROAD to add bends manually without internet.";
                 }
             } catch (Exception ex) {
                 error = ex.getMessage() == null ? "No connected road geometry found" : ex.getMessage();
@@ -792,10 +930,11 @@ public final class MainActivity extends Activity {
                     String message = problem == null ? "Could not snap road stretch" : problem;
                     if (mapStatusLabel != null) mapStatusLabel.setText("Not saved: " + message);
                     new AlertDialog.Builder(this)
-                            .setTitle("No safe snapped route")
-                            .setMessage(message + "\n\nZoom in and choose two points on the same road. " +
-                                    "No straight-line speed limit was created.")
-                            .setPositiveButton("OK", null)
+                            .setTitle("No local route found")
+                            .setMessage(message + "\n\nTRACE ROAD lets you mark the start, bends and end. " +
+                                    "It does not depend on OpenStreetMap connectivity.")
+                            .setNegativeButton("Cancel", null)
+                            .setPositiveButton("TRACE ROAD", (d, w) -> beginManualTrace())
                             .show();
                     return;
                 }
@@ -810,11 +949,17 @@ public final class MainActivity extends Activity {
     }
 
     private void promptRoadLimit(List<RoadSegment> roads, List<RoadSegment> selected, String suggestedName) {
-        promptRoadLimit(roads, selected, suggestedName, false, false);
+        promptRoadLimit(roads, selected, suggestedName, false, false, false);
     }
 
     private void promptRoadLimit(List<RoadSegment> roads, List<RoadSegment> selected,
                                  String suggestedName, boolean isMapPreview, boolean fromOsm) {
+        promptRoadLimit(roads, selected, suggestedName, isMapPreview, fromOsm, false);
+    }
+
+    private void promptRoadLimit(List<RoadSegment> roads, List<RoadSegment> selected,
+                                 String suggestedName, boolean isMapPreview,
+                                 boolean fromOsm, boolean tracedManually) {
         if (!editingAllowed()) return;
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -822,21 +967,26 @@ public final class MainActivity extends Activity {
         EditText name = new EditText(this);
         name.setHint("Road name");
         name.setSingleLine(true);
-        name.setText(RoadLimitEditor.baseName(suggestedName));
+        name.setText(tracedManually ? "" : RoadLimitEditor.baseName(suggestedName));
+        if (tracedManually) name.setHint("Enter verified street name");
         layout.addView(name);
         EditText limit = new EditText(this);
         limit.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
         limit.setHint("New limit, km/h");
         // OSM way geometry is not evidence of a legal speed limit.
-        if (!fromOsm) limit.setText(String.valueOf((int) selected.get(0).limitKph));
+        if (!fromOsm && !tracedManually)
+            limit.setText(String.valueOf((int) selected.get(0).limitKph));
         layout.addView(limit);
         double total = 0;
         for (RoadSegment section : selected) total += RoadLimitEditor.lengthM(section);
         TextView note = label(String.format(Locale.US,
-                "Overwrite limit on %d snapped piece(s), approximately %.0f metres. " +
-                "Where this overlaps an older mapped road, the flanks keep their existing limits. " +
-                "The orange road preview must match the intended stretch. " +
-                "Enter only a verified posted speed limit; OSM geometry does not verify the limit.",
+                (tracedManually ?
+                    "MANUALLY TRACED — not snapped to map data. Check every orange " +
+                    "section follows the actual road before saving. " :
+                    "Snapped to connected road geometry. ") +
+                "Edit %d pieces (approximately %.0f metres). " +
+                "Nearby roads could be affected by GPS matching; check alignment. " +
+                "Only enter a verified posted speed limit.",
                 selected.size(), total), 14, false);
         layout.addView(note);
         new AlertDialog.Builder(this)
