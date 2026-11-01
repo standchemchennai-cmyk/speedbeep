@@ -188,6 +188,152 @@ The workflow at `.github/workflows/build-apk.yml` builds an installable Android 
 
 By default, builds use the committed offline Chennai speed-limit database; an OpenStreetMap server outage cannot block APK creation. To request new OSM limits during a manual build, enable the optional `refresh_osm` input. If OSM endpoints are unavailable, the importer keeps the existing bundled road data and proceeds with the build. GitHub Actions only retains APK artifacts for 30 days.
 
+## Android full-screen map (performance fix)
+
+Tap **OPEN FULL-SCREEN MAP** from the speedometer screen. The map is no longer
+nested inside the screen's vertical scroll area, so dragging and pinching do not
+compete with screen scrolling. It initially centers on a recent GPS position
+when one is available, otherwise it opens at the last map center (initially
+Chennai). Use **FOLLOW GPS** to recenter and track your location without
+continually resetting your zoom, **FIT ROADS** for an overview, or manually pan
+and zoom to explore.
+
+The map displays saved road geometry in green when zoomed in sufficiently,
+a bounded drive trail in blue (over-limit segments red; unknown-limit segments
+grey), and a GPS marker. The full database is still used for speed alerts;
+the map hides the green road overlay at wide zoom levels only to avoid drawing
+thousands of tiny lines. No mapped speed-limit geometry is deleted or changed.
+
+**EDIT STRETCH** (or the existing **SELECT A STRETCH ON MAP** button) enters
+two-tap mode on the full-screen map. Tap the beginning and end of the same
+configured road piece to split its limit; the existing verification and save
+dialog remains in place. Back or Close cancels selection.
+
+**Implementation:** nearby roads and the latest 4,000 trail samples are
+rendered with two canvas overlays rather than thousands of individual
+Polyline objects. Diagnostic-log parsing happens on a worker thread and
+only while the map is visible. Tiles are cached by osmdroid and still need
+internet for previously unseen areas. A failed log read preserves the
+previously displayed trail. The speed alarm, background service, CSV edit
+logic and exported database remain unchanged.
+
+**Map reopen regression (0.4.2):** osmdroid destroys its tile provider when an Android Dialog detaches the MapView. Because SpeedBeep reuses the same MapView on the next open, the tiles previously disappeared. This version disables automatic destruction on temporary window detach and keeps explicit final cleanup in MainActivity.onDestroy(). Verify at least five consecutive open/close cycles, including zooming/panning, followed by background/foreground and opening the map again.\n\n**Manual phone QA before merging:** Open/close the map repeatedly; pinch/drag
+near Chennai and use Follow GPS / Fit Roads; verify speed monitoring still
+works while the map is open; check blue/red drive trace; edit a stretch and
+verify the saved road limit; test missing internet/uncached tiles and repeated
+background/foreground transitions. Run the pull-request APK CI as well.
+
+## Map stretch snapping and curves (0.4.3)
+
+**EDIT STRETCH** now snaps the two taps to the closest local speed-limit road
+pieces and follows the connected road's actual corners rather than saving a
+straight shortcut. A bright orange preview appears on the map before the
+speed-limit confirmation. Check the selected geometry carefully, especially
+at junctions or divided carriageways. The editor applies one verified speed
+limit to the selected stretch only; the unaffected ends of earlier limits are
+preserved. Edits must be made while safely parked or by a passenger.
+
+**Offline-first fix (0.4.4):** The local speed-limit CSV contains only roads
+with stored limits. The first attempt still automatically snaps start/end taps
+to any matching connected CSV segments; it does **not** call OSM Overpass.
+If it cannot find a connected route, it offers **TRACE ROAD** rather than
+waiting for a slow/unavailable external server.
+
+For an unmapped road, tap **TRACE ROAD** on the full-screen map, then tap
+**START**, every bend (up to 150 m between points), and **END**. The orange
+line previews the complete multi-segment trace. **UNDO** deletes your last
+point; **FINISH** presents the confirmation dialog, asking for the verified
+street name and posted speed limit. **CANCEL TRACE** abandons it without
+changing the CSV. The trace does **not** automatically snap to unseen OSM
+roads or identify official speed limits; position the points carefully and
+check the orange line visually. The GPS matching corridor is narrower for
+manually traced roads to reduce interference with parallel lanes.
+
+These road edits work without an Overpass connection, including when tiles
+are already cached or offline. Limit traces to four kilometres and at most
+100 points. On-device QA: (1) snap existing connected roads, (2) fail
+automatic snapping and choose TRACE ROAD, (3) make a curved road with
+intermediate corners and save, (4) undo a point / cancel / reopen, (5) confirm
+speed limits on the curved sections after saving. **Only edit while parked
+or as a passenger.**
+
+## Universal Speed Limit (0.4.5)
+
+Open **UNIVERSAL SPEED LIMIT** in the SpeedBeep app. Enable the toggle and
+choose a personal ceiling in km/h (5–200). It is **off by default** and
+stored independently of the unmapped-road fallback and the road-specific
+CSV. Settings take effect on the next valid GPS fix, without restarting
+monitoring. The main screen shows the configured universal ceiling, and
+the monitoring status shows which alarm threshold actually wins.
+
+The universal ceiling is a *personal overspeed alert*, not a claim about
+the legal limit of any road. On reliable GPS fixes, it applies whether the
+road is matched, unmatched, or an unmapped fallback is in use. It has no
+additional speed margin: e.g., if set to 60 km/h, the app begins its
+overspeed hold when measured GPS speed exceeds 60. The existing 2-second
+hold and 4-second repeat remain, so it is not a hard speed governor.
+
+**The most restrictive alert wins**: a matched road with a 40 km/h limit
+and 3 km/h margin will still warn above 43 even when the universal ceiling
+is 60. Conversely a mapped 80 km/h road warns above 60 if universal is
+enabled at 60. The separate unmapped-road fallback still behaves as
+before and can be turned off independently. Only one alert sound is played
+at a time; in Voice mode a universal alarm announces "Universal speed
+limit XX". If GPS accuracy exceeds the service's safety cutoff (±60 m),
+the alarm is temporarily withheld as before, to avoid false speed alerts.
+
+Test cases: universal off, universal on with mapped lower/higher limits,
+unmapped road with fallback off and on, change universal while monitoring
+and verify the foreground notification's effective threshold. Confirm
+all existing speed/alarm modes remain functional.
+
+## Multiple CSV profiles and sharing (0.4.6)
+
+Open **SELECT / MANAGE CSV PROFILES** to maintain separate road-limit
+databases for different vehicles and driving arrangements, such as
+"XL6 — self drive", "Thar — driver" and "Family car". You may:
+
+- **USE SELECTED**: switch the active road database; SpeedBeep reloads its
+  matching and alarms immediately when monitoring is running.
+- **COPY SELECTED**: duplicate a profile for independent editing. Future edits
+  apply only to that copy; there is no shared CSV behind the scenes.
+- **IMPORT NEW**: pick a CSV on your phone and give it a unique name. The
+  imported file becomes its own profile and is activated.
+- **RENAME**: change a profile's display name without changing its CSV.
+- **SHARE CSV**: send the selected profile's actual `.csv` through Android's
+  Share Sheet (WhatsApp, email, Drive, Nearby Share, etc.). The recipient can
+  import it as a new profile in their copy of SpeedBeep. Sharing sends a
+  snapshot, **not** a live-synced file; future edits will not automatically
+  propagate to other devices.
+- **DELETE**: delete an inactive profile and its local CSV after confirmation.
+  You cannot delete the active profile without switching away first.
+
+The old pre-upgrade `speed_limits.csv` is **copied without modification**
+into the initial **Default roads** profile on first use; the original legacy
+file is retained in app-private storage for recovery. Existing manual speed
+edits survive migration. New files are stored privately under
+`files/road_profiles/` with opaque UUID file names. CSV imports are
+validated and profile edits are written atomically to avoid partial writes.
+
+The main screen always displays **Active CSV: <profile name>**. Ordinary
+**IMPORT CSV** replaces only the currently active profile, and **EXPORT
+ACTIVE CSV** exports the active profile under a descriptive filename.
+The separate universal ceiling, fallback limit, alarm tone and GPS permission
+are still **app-wide**, not per-profile; profiles currently contain **road
+segments only**.
+
+For security, sharing uses a temporary read-only Android FileProvider URI;
+the app does not upload CSVs or create any account. Road profiles remain on
+this device unless you explicitly export or share them.
+
+**QA:** Upgrade an existing 0.4.5 install with local edits and confirm the
+default CSV matches; copy to a second profile and edit a limit; switch back
+and ensure original unchanged; switch profiles while monitoring; import a
+third CSV and test matching; share an inactive CSV; verify the recipient
+can import it; try a bad CSV (must not overwrite anything); reject deleting
+active profile; check restart persistence. Universal limit should remain
+unchanged when switching CSVs.
+
 ## Local map editor
 
 Open `tools/speed_limit_editor.html` in a desktop browser.

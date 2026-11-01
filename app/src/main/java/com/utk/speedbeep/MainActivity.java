@@ -43,17 +43,27 @@ public final class MainActivity extends Activity {
     private static final int REQ_IMPORT = 200;
     private static final int REQ_EXPORT = 201;
     private static final int REQ_LOG_EXPORT = 202;
+    private static final int REQ_IMPORT_NEW_PROFILE = 203;
 
     private OSMTripMap tripMap;
+    private android.app.Dialog mapDialog;
+    private TextView mapStatusLabel;
+    private boolean followMapGps = true;
     private long lastMapReload = 0;
     private TextView bigSpeed;
     private TextView roadText;
     private TextView limitText;
+    private TextView universalStatusText;
     private TextView detailText;
     private TextView csvText;
+    private TextView activeProfileText;
+    private String pendingImportProfileId;
+    private String pendingImportNewName;
+    private String pendingExportProfileId;
     private Button startButton;
     private Button stopButton;
     private Button alarmButton;
+    private Button universalButton;
     private EditText quickLimitInput;
     private TextView quickRoadHint;
     private TextView quickSavedHint;
@@ -75,6 +85,11 @@ public final class MainActivity extends Activity {
     private static final float MAX_QUICK_FIX_ACCURACY_M = 30f;
     private boolean selectingMapStretch = false;
     private double[] stretchStart;
+    private boolean manualTracing = false;
+    private final List<double[]> manualTracePoints = new ArrayList<>();
+    private Button traceButton;
+    private Button traceUndoButton;
+    private Button traceFinishButton;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final Runnable refreshRunnable = new Runnable() {
@@ -87,6 +102,11 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Configure tile caching and identification before constructing osmdroid's MapView.
+        org.osmdroid.config.Configuration.getInstance().load(
+                getApplicationContext(), getSharedPreferences("osmdroid", MODE_PRIVATE));
+        org.osmdroid.config.Configuration.getInstance().setUserAgentValue(
+                "SpeedBeep/0.4.0 (com.utk.speedbeep)");
         setContentView(buildUi());
         refreshCsvInfo();
     }
@@ -129,6 +149,8 @@ public final class MainActivity extends Activity {
         detailText.setPadding(0, dp(8), 0, dp(16));
         root.addView(roadText);
         root.addView(limitText);
+        universalStatusText = label("Universal ceiling: OFF", 18, true);
+        root.addView(universalStatusText);
         root.addView(detailText);
 
         LinearLayout buttons = new LinearLayout(this);
@@ -173,25 +195,40 @@ public final class MainActivity extends Activity {
         quickSavedHint = label("Uses your live GPS road match. Save only verified speed limits.", 13, false);
         root.addView(quickSavedHint);
 
+        activeProfileText = label("Active CSV: checking…", 19, true);
+        root.addView(activeProfileText);
+        Button profiles = new Button(this);
+        profiles.setText("SELECT / MANAGE CSV PROFILES");
+        profiles.setOnClickListener(v -> showProfileManager());
+        root.addView(profiles, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+
         Button exportButton = new Button(this);
-        exportButton.setText("EXPORT SPEED DATABASE");
+        exportButton.setText("EXPORT ACTIVE CSV");
         exportButton.setOnClickListener(v -> exportCsv());
         root.addView(exportButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
 
         tripMap = new OSMTripMap(this);
-        root.addView(tripMap, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(380)));
-        Button fitMap = new Button(this);
-        fitMap.setText("FIT ALL CONFIGURED ROADS");
-        fitMap.setOnClickListener(v -> tripMap.fitRoads());
-        root.addView(fitMap);
-        TextView mapHelp = label("OpenStreetMap: pinch to zoom, drag to pan. To override part of a long segment, choose SELECT A STRETCH and tap its start and end. Tiles need internet initially.", 13, false);
+        Button openMap = new Button(this);
+        openMap.setText("OPEN FULL-SCREEN MAP");
+        openMap.setOnClickListener(v -> showMapDialog());
+        root.addView(openMap, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+        TextView mapHelp = label("Full-screen OpenStreetMap: follow GPS, pinch/drag, see nearby saved road limits and edit a stretch. Internet needed for uncached tiles.", 13, false);
         root.addView(mapHelp);
 
         alarmButton = new Button(this);
         alarmButton.setOnClickListener(v -> showAlarmSettings());
         updateAlarmButton();
         root.addView(alarmButton);
+
+        // Separate from the user-defined unmapped-road fallback. This ceiling
+        // applies on every reliable GPS fix, even if no road is matched.
+        universalButton = new Button(this);
+        universalButton.setOnClickListener(v -> showUniversalSettings());
+        root.addView(universalButton);
+        updateUniversalButton();
 
         Button fallbackButton = new Button(this);
         fallbackButton.setText("UNMAPPED ROAD SPEED SETTINGS");
@@ -209,7 +246,7 @@ public final class MainActivity extends Activity {
         root.addView(currentRoadButton);
 
         Button pickStretchButton = new Button(this);
-        pickStretchButton.setText("SELECT A STRETCH ON MAP (SPLIT EXISTING LIMIT)");
+        pickStretchButton.setText("SELECT A STRETCH ON MAP (SNAP TO ROAD)");
         pickStretchButton.setOnClickListener(v -> chooseMapStretch());
         root.addView(pickStretchButton);
 
@@ -439,6 +476,15 @@ public final class MainActivity extends Activity {
         quickSaving = true;
         quickSetButton.setEnabled(false);
         quickSavedHint.setText("Detecting road and saving limit…");
+        final String editProfileId;
+        try {
+            editProfileId = RoadProfileStore.activeId(this);
+        } catch (IOException ex) {
+            quickSaving = false;
+            quickSetButton.setEnabled(true);
+            toast("CSV profile error: " + ex.getMessage());
+            return;
+        }
         final double lat = fix.lat, lon = fix.lon;
         final float accuracy = fix.accuracyM;
         final boolean hasBearing = fix.hasBearing;
@@ -447,7 +493,7 @@ public final class MainActivity extends Activity {
 
         editExecutor.execute(() -> {
             try {
-                List<RoadSegment> currentRoads = LocalRoadStore.load(this);
+                List<RoadSegment> currentRoads = LocalRoadStore.loadForProfile(this, editProfileId);
                 // Prefer a reliable locally mapped road at the tap-time GPS fix.
                 // A 4 m cutoff was incorrect: normal OSM/GPS offsets can be
                 // 10 m or more on the same already-configured road.
@@ -497,7 +543,7 @@ public final class MainActivity extends Activity {
 
                 List<RoadSegment> updated = RoadLimitEditor.override(
                         currentRoads, parts, newLimit, roadName);
-                LocalRoadStore.save(this, updated);
+                LocalRoadStore.saveForProfile(this, editProfileId, updated);
                 runOnUiThread(() -> {
                     quickSaving = false;
                     quickSetButton.setEnabled(true);
@@ -586,8 +632,145 @@ public final class MainActivity extends Activity {
         }
     }
 
+
+    /** A map cannot reliably compete with the main screen's vertical ScrollView for gestures. */
+    private void showMapDialog() {
+        if (mapDialog != null && mapDialog.isShowing()) return;
+        followMapGps = !selectingMapStretch;
+        final android.app.Dialog dialog = new android.app.Dialog(
+                this, android.R.style.Theme_Material_Light_NoActionBar);
+        mapDialog = dialog;
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(8), dp(8), dp(8), dp(8));
+
+        LinearLayout heading = new LinearLayout(this);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = label("SpeedBeep Map", 22, true);
+        heading.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1));
+        Button close = new Button(this);
+        close.setText("CLOSE");
+        close.setOnClickListener(v -> dialog.dismiss());
+        heading.addView(close);
+        content.addView(heading);
+
+        // Map is attached only while visible: no map tile rendering on the speedometer screen.
+        content.addView(tripMap, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+
+        mapStatusLabel = label("Drag/pinch to explore. Green: saved roads, blue: GPS trail, red: over limit.",
+                13, false);
+        content.addView(mapStatusLabel);
+
+        LinearLayout controls = new LinearLayout(this);
+        Button follow = new Button(this);
+        follow.setText("FOLLOW GPS");
+        follow.setOnClickListener(v -> {
+            double[] fix = recentMapPosition();
+            if (fix == null) {
+                toast("Waiting for a fresh GPS position");
+                return;
+            }
+            followMapGps = true;
+            tripMap.centerOn(fix[0], fix[1]);
+            follow.setText("FOLLOWING");
+        });
+        controls.addView(follow, new LinearLayout.LayoutParams(0, dp(56), 1));
+
+        Button fit = new Button(this);
+        fit.setText("FIT ROADS");
+        fit.setOnClickListener(v -> {
+            followMapGps = false;
+            follow.setText("FOLLOW GPS");
+            tripMap.fitRoads();
+        });
+        controls.addView(fit, new LinearLayout.LayoutParams(0, dp(56), 1));
+
+        Button edit = new Button(this);
+        edit.setText("EDIT STRETCH");
+        edit.setOnClickListener(v -> chooseMapStretch());
+        controls.addView(edit, new LinearLayout.LayoutParams(0, dp(56), 1));
+        content.addView(controls);
+
+        LinearLayout traceControls = new LinearLayout(this);
+        traceButton = new Button(this);
+        traceButton.setText("TRACE ROAD");
+        traceButton.setOnClickListener(v -> {
+            if (manualTracing) stopManualTrace(true);
+            else beginManualTrace();
+        });
+        traceControls.addView(traceButton, new LinearLayout.LayoutParams(0, dp(56), 1));
+        traceUndoButton = new Button(this);
+        traceUndoButton.setText("UNDO");
+        traceUndoButton.setVisibility(View.GONE);
+        traceUndoButton.setOnClickListener(v -> undoManualTracePoint());
+        traceControls.addView(traceUndoButton, new LinearLayout.LayoutParams(0, dp(56), 1));
+        traceFinishButton = new Button(this);
+        traceFinishButton.setText("FINISH");
+        traceFinishButton.setVisibility(View.GONE);
+        traceFinishButton.setOnClickListener(v -> finishManualTrace());
+        traceControls.addView(traceFinishButton, new LinearLayout.LayoutParams(0, dp(56), 1));
+        content.addView(traceControls);
+
+        tripMap.setOnTouchListener((v, event) -> {
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN
+                    && followMapGps && !selectingMapStretch) {
+                followMapGps = false;
+                follow.setText("FOLLOW GPS");
+            }
+            return false; // osmdroid must continue receiving all touch gestures
+        });
+
+        dialog.setOnDismissListener(d -> {
+            tripMap.onPause();
+            tripMap.clearRoutePreview();
+            tripMap.setOnTouchListener(null);
+            if (tripMap.getParent() instanceof android.view.ViewGroup)
+                ((android.view.ViewGroup) tripMap.getParent()).removeView(tripMap);
+            if (selectingMapStretch) stopMapSelection();
+            if (manualTracing) stopManualTrace(true);
+            traceButton = null;
+            traceUndoButton = null;
+            traceFinishButton = null;
+            mapStatusLabel = null;
+            mapDialog = null;
+        });
+        dialog.setContentView(content);
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT);
+        }
+        tripMap.onResume();
+        double[] fix = recentMapPosition();
+        if (fix != null) {
+            tripMap.setPosition(fix[0], fix[1]);
+            if (followMapGps) tripMap.centerOn(fix[0], fix[1]);
+        }
+        follow.setText(followMapGps && fix != null ? "FOLLOWING" : "FOLLOW GPS");
+        tripMap.reloadTrip();
+    }
+
+    private double[] recentMapPosition() {
+        if (latestUiLocation != null &&
+                Math.abs(System.currentTimeMillis() - latestUiLocation.getTime()) < 15000L) {
+            return new double[]{latestUiLocation.getLatitude(), latestUiLocation.getLongitude()};
+        }
+        SharedPreferences p = getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE);
+        long updated = p.getLong("updatedAt", 0L);
+        if (updated > 0 && Math.abs(System.currentTimeMillis() - updated) < 30000L) {
+            float lat = p.getFloat("latitude", Float.NaN);
+            float lon = p.getFloat("longitude", Float.NaN);
+            if (Float.isFinite(lat) && Float.isFinite(lon)) return new double[]{lat, lon};
+        }
+        return null;
+    }
+
     private void chooseMapStretch() {
         if (!editingAllowed()) return;
+        if (manualTracing) stopManualTrace(true);
         if (selectingMapStretch) {
             stopMapSelection();
             toast("Map stretch selection cancelled");
@@ -595,7 +778,11 @@ public final class MainActivity extends Activity {
         }
         selectingMapStretch = true;
         stretchStart = null;
+        followMapGps = false;
+        showMapDialog();
+        if (mapStatusLabel != null) mapStatusLabel.setText("Editing: tap START, then END of the road stretch.");
         tripMap.clearEditPoints();
+        tripMap.clearRoutePreview();
         tripMap.setPointTapListener((lat, lon) -> {
             if (!selectingMapStretch) return;
             if (stretchStart == null) {
@@ -620,37 +807,192 @@ public final class MainActivity extends Activity {
         stretchStart = null;
         tripMap.setPointTapListener(null);
         tripMap.clearEditPoints();
+        if (mapStatusLabel != null)
+            mapStatusLabel.setText("Drag/pinch to explore. Green: saved roads, blue: trail, red: over limit.");
+    }
+
+    /** Add intermediate bends on any road. No network request or OSM assumption. */
+    private void beginManualTrace() {
+        if (!editingAllowed()) return;
+        if (selectingMapStretch) stopMapSelection();
+        manualTracing = true;
+        manualTracePoints.clear();
+        followMapGps = false;
+        tripMap.clearEditPoints();
+        tripMap.clearRoutePreview();
+        if (traceButton != null) traceButton.setText("CANCEL TRACE");
+        if (traceUndoButton != null) traceUndoButton.setVisibility(View.VISIBLE);
+        if (traceFinishButton != null) traceFinishButton.setVisibility(View.VISIBLE);
+        if (mapStatusLabel != null) mapStatusLabel.setText(
+                "TRACE ROAD: Tap START, each bend (within 150 m), then END. Press FINISH.");
+        tripMap.setPointTapListener((lat, lon) -> {
+            if (!manualTracing) return;
+            List<double[]> candidate = new ArrayList<>(manualTracePoints);
+            candidate.add(new double[]{lat, lon});
+            if (candidate.size() > 1) {
+                try {
+                    ManualRoadTrace.build(candidate);
+                } catch (IllegalArgumentException ex) {
+                    toast(ex.getMessage());
+                    return;
+                }
+            }
+            manualTracePoints.add(new double[]{lat, lon});
+            redrawManualTrace();
+        });
+        toast("Tap along the road: start, bends, end. Press FINISH to review. No internet required.");
+    }
+
+    private void redrawManualTrace() {
+        tripMap.clearEditPoints();
+        for (int i = 0; i < manualTracePoints.size(); i++) {
+            double[] point = manualTracePoints.get(i);
+            tripMap.markEditPoint(point[0], point[1],
+                    i == 0 ? "Road start" : "Road point " + (i + 1));
+        }
+        if (manualTracePoints.size() >= 2) {
+            ManualRoadTrace.Result route = ManualRoadTrace.build(manualTracePoints);
+            tripMap.showRoutePreview(route.pieces);
+            if (mapStatusLabel != null) mapStatusLabel.setText(String.format(Locale.US,
+                    "Orange manual trace: %d points, %.0f m. Tap next bend or press FINISH.",
+                    manualTracePoints.size(), route.lengthM));
+        } else {
+            tripMap.clearRoutePreview();
+            if (mapStatusLabel != null) mapStatusLabel.setText(
+                    "Road start marked. Tap every bend and the END (150 m maximum between taps).");
+        }
+        if (traceUndoButton != null)
+            traceUndoButton.setEnabled(!manualTracePoints.isEmpty());
+        if (traceFinishButton != null)
+            traceFinishButton.setEnabled(manualTracePoints.size() >= 2);
+    }
+
+    private void undoManualTracePoint() {
+        if (!manualTracing || manualTracePoints.isEmpty()) return;
+        manualTracePoints.remove(manualTracePoints.size() - 1);
+        redrawManualTrace();
+    }
+
+    private void stopManualTrace(boolean removePreview) {
+        manualTracing = false;
+        manualTracePoints.clear();
+        tripMap.setPointTapListener(null);
+        tripMap.clearEditPoints();
+        if (removePreview) tripMap.clearRoutePreview();
+        if (traceButton != null) traceButton.setText("TRACE ROAD");
+        if (traceUndoButton != null) traceUndoButton.setVisibility(View.GONE);
+        if (traceFinishButton != null) traceFinishButton.setVisibility(View.GONE);
+        if (mapStatusLabel != null && removePreview) mapStatusLabel.setText(
+                "Manual tracing cancelled. No road changes saved.");
+    }
+
+    private void finishManualTrace() {
+        if (!manualTracing) return;
+        final ManualRoadTrace.Result trace;
+        try {
+            trace = ManualRoadTrace.build(new ArrayList<>(manualTracePoints));
+        } catch (IllegalArgumentException ex) {
+            toast(ex.getMessage());
+            return;
+        }
+        stopManualTrace(false);
+        if (mapStatusLabel != null) mapStatusLabel.setText(String.format(Locale.US,
+                "Orange manual trace (NOT automatic OSM snap): %.0f m. Verify path before saving.",
+                trace.lengthM));
+        editExecutor.execute(() -> {
+            try {
+                List<RoadSegment> existing = LocalRoadStore.load(this);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed() ||
+                            mapDialog == null || !mapDialog.isShowing()) return;
+                    promptRoadLimit(existing, trace.pieces,
+                            "Manual road trace", true, true, true);
+                });
+            } catch (IOException ex) {
+                runOnUiThread(() -> {
+                    if (mapStatusLabel != null)
+                        mapStatusLabel.setText("Cannot load local road database: " + ex.getMessage());
+                    toast("Could not load road database: " + ex.getMessage());
+                });
+            }
+        });
     }
 
     private void promptMapStretch(double startLat, double startLon, double endLat, double endLon) {
-        try {
-            List<RoadSegment> roads = LocalRoadStore.load(this);
-            GeoMatcher.Match a = GeoMatcher.findBest(startLat, startLon, 0, roads);
-            GeoMatcher.Match b = GeoMatcher.findBest(endLat, endLon, 0, roads);
-            RoadSegment piece;
-            if (a != null && b != null && a.road == b.road &&
-                    a.distanceM <= 20 && b.distanceM <= 20) {
-                // Precise snapping permits cutting an existing long segment in THREE parts.
-                piece = RoadLimitEditor.betweenTaps(a.road, startLat, startLon, endLat, endLon);
-            } else if (a == null && b == null) {
-                // No geometry in the offline CSV: the user can define a new straight road.
-                piece = new RoadSegment("New unmapped stretch", startLat, startLon, endLat, endLon,
-                        40, 20, 3);
-                if (RoadLimitEditor.lengthM(piece) < 2) {
-                    toast("Choose two different points"); return;
+        // Loading and connected-graph search can be expensive; NEVER block map gestures.
+        if (mapStatusLabel != null)
+            mapStatusLabel.setText("Finding connected road geometry…");
+        final java.util.concurrent.atomic.AtomicBoolean cancelled =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        final android.app.AlertDialog progress = new AlertDialog.Builder(this)
+                .setTitle("Snapping road stretch")
+                .setMessage("Following the mapped road between your two taps…")
+                .setNegativeButton("Cancel", (d, w) -> {
+                    cancelled.set(true);
+                    if (mapStatusLabel != null)
+                        mapStatusLabel.setText("Road selection cancelled; no changes saved.");
+                })
+                .create();
+        progress.show();
+        editExecutor.execute(() -> {
+            MapStretchRouter.Route candidate = null;
+            List<RoadSegment> original = null;
+            String error = null;
+            try {
+                original = LocalRoadStore.load(this);
+                try {
+                    candidate = MapStretchRouter.route(original,
+                            startLat, startLon, endLat, endLon, false);
+                } catch (MapStretchRouter.RouteNotFoundException missing) {
+                    // The local speed-limit CSV does not contain every street.
+                    // Do not block editing on a third-party Overpass server.
+                    // Offer immediate offline multi-point tracing instead.
+                    error = "No connected local road geometry for those taps. " +
+                            "Choose TRACE ROAD to add bends manually without internet.";
                 }
-            } else {
-                toast("Choose both endpoints on the SAME configured straight segment. " +
-                        "For a curved road, edit its connected road or repeat with shorter stretches.");
-                return;
+            } catch (Exception ex) {
+                error = ex.getMessage() == null ? "No connected road geometry found" : ex.getMessage();
             }
-            promptRoadLimit(roads, java.util.Collections.singletonList(piece), piece.name);
-        } catch (Exception ex) {
-            toast("Could not select stretch: " + ex.getMessage());
-        }
+            final MapStretchRouter.Route route = candidate;
+            final List<RoadSegment> snapshot = original;
+            final String problem = error;
+            runOnUiThread(() -> {
+                progress.dismiss();
+                if (isFinishing() || isDestroyed() || cancelled.get()) return;
+                if (problem != null || route == null || snapshot == null) {
+                    String message = problem == null ? "Could not snap road stretch" : problem;
+                    if (mapStatusLabel != null) mapStatusLabel.setText("Not saved: " + message);
+                    new AlertDialog.Builder(this)
+                            .setTitle("No local route found")
+                            .setMessage(message + "\n\nTRACE ROAD lets you mark the start, bends and end. " +
+                                    "It does not depend on OpenStreetMap connectivity.")
+                            .setNegativeButton("Cancel", null)
+                            .setPositiveButton("TRACE ROAD", (d, w) -> beginManualTrace())
+                            .show();
+                    return;
+                }
+                tripMap.showRoutePreview(route.parts);
+                if (mapStatusLabel != null)
+                    mapStatusLabel.setText(String.format(Locale.US,
+                            "Orange preview: %s, %.0f m over %d pieces. Confirm before saving.",
+                            route.name, route.lengthM, route.parts.size()));
+                promptRoadLimit(snapshot, route.parts, route.name, true, route.fromOsm);
+            });
+        });
     }
 
     private void promptRoadLimit(List<RoadSegment> roads, List<RoadSegment> selected, String suggestedName) {
+        promptRoadLimit(roads, selected, suggestedName, false, false, false);
+    }
+
+    private void promptRoadLimit(List<RoadSegment> roads, List<RoadSegment> selected,
+                                 String suggestedName, boolean isMapPreview, boolean fromOsm) {
+        promptRoadLimit(roads, selected, suggestedName, isMapPreview, fromOsm, false);
+    }
+
+    private void promptRoadLimit(List<RoadSegment> roads, List<RoadSegment> selected,
+                                 String suggestedName, boolean isMapPreview,
+                                 boolean fromOsm, boolean tracedManually) {
         if (!editingAllowed()) return;
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -658,31 +1000,44 @@ public final class MainActivity extends Activity {
         EditText name = new EditText(this);
         name.setHint("Road name");
         name.setSingleLine(true);
-        name.setText(RoadLimitEditor.baseName(suggestedName));
+        name.setText(tracedManually ? "" : RoadLimitEditor.baseName(suggestedName));
+        if (tracedManually) name.setHint("Enter verified street name");
         layout.addView(name);
         EditText limit = new EditText(this);
         limit.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
         limit.setHint("New limit, km/h");
-        limit.setText(String.valueOf((int) selected.get(0).limitKph));
+        // OSM way geometry is not evidence of a legal speed limit.
+        if (!fromOsm && !tracedManually)
+            limit.setText(String.valueOf((int) selected.get(0).limitKph));
         layout.addView(limit);
         double total = 0;
         for (RoadSegment section : selected) total += RoadLimitEditor.lengthM(section);
         TextView note = label(String.format(Locale.US,
-                "Overwrite limit on %d selected piece(s), approximately %.0f metres. " +
-                "Where it overlaps an older longer segment, the unaffected sections keep their limits. " +
-                "Please use verified posted limits, not estimates.",
+                (tracedManually ?
+                    "MANUALLY TRACED — not snapped to map data. Check every orange " +
+                    "section follows the actual road before saving. " :
+                    "Snapped to connected road geometry. ") +
+                "Edit %d pieces (approximately %.0f metres). " +
+                "Nearby roads could be affected by GPS matching; check alignment. " +
+                "Only enter a verified posted speed limit.",
                 selected.size(), total), 14, false);
         layout.addView(note);
         new AlertDialog.Builder(this)
                 .setTitle("Override road speed limit")
                 .setView(layout)
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton("Cancel", (d, w) -> {
+                    if (isMapPreview) tripMap.clearRoutePreview();
+                })
                 .setPositiveButton("Save", (d, w) -> {
                     try {
                         double value = Double.parseDouble(limit.getText().toString().trim());
                         List<RoadSegment> result = RoadLimitEditor.override(
                                 roads, selected, value, name.getText().toString().trim());
-                        saveEditedRoads(result);
+                        if (saveEditedRoads(result) && isMapPreview) {
+                            tripMap.clearRoutePreview();
+                            if (mapStatusLabel != null)
+                                mapStatusLabel.setText("Snapped road limit saved. Tap EDIT STRETCH for another section.");
+                        }
                     } catch (IllegalArgumentException ex) {
                         toast("Invalid speed limit or road: " + ex.getMessage());
                     }
@@ -750,6 +1105,81 @@ public final class MainActivity extends Activity {
         dialog.setOnDismissListener(d -> previewPlayer.close());
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
                 .setOnClickListener(v -> previewPlayer.preview(checkedAlarmMode(choices, radioIds))));
+        dialog.show();
+    }
+
+    private void updateUniversalButton() {
+        SharedPreferences p = getSharedPreferences(SpeedMonitorService.SETTINGS, MODE_PRIVATE);
+        boolean enabled = p.getBoolean(SpeedMonitorService.KEY_UNIVERSAL_ENABLED, false);
+        float kph = p.getFloat(SpeedMonitorService.KEY_UNIVERSAL_KPH, 60f);
+        if (universalButton != null) universalButton.setText(enabled
+                ? String.format(Locale.US, "UNIVERSAL SPEED LIMIT: ON (%.0f km/h)", kph)
+                : "UNIVERSAL SPEED LIMIT: OFF");
+        if (universalStatusText != null) universalStatusText.setText(enabled
+                ? String.format(Locale.US, "Universal ceiling: %.0f km/h (ON, everywhere)", kph)
+                : "Universal ceiling: OFF");
+    }
+
+    private void showUniversalSettings() {
+        SharedPreferences settings = getSharedPreferences(
+                SpeedMonitorService.SETTINGS, MODE_PRIVATE);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(20), dp(8), dp(20), dp(8));
+
+        CheckBox enabled = new CheckBox(this);
+        enabled.setText("Enable a universal speed ceiling on every road");
+        enabled.setChecked(settings.getBoolean(
+                SpeedMonitorService.KEY_UNIVERSAL_ENABLED, false));
+        layout.addView(enabled);
+
+        EditText limit = new EditText(this);
+        limit.setSingleLine(true);
+        limit.setHint("Maximum speed in km/h (5–200)");
+        limit.setInputType(InputType.TYPE_CLASS_NUMBER |
+                InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        limit.setText(String.valueOf((int) settings.getFloat(
+                SpeedMonitorService.KEY_UNIVERSAL_KPH, 60f)));
+        layout.addView(limit);
+
+        TextView explanation = label(
+                "Independent of mapped limits and the unmapped-road fallback. " +
+                "If enabled, the alarm triggers above this speed anywhere GPS " +
+                "is reliable, without an extra tolerance. Existing lower road " +
+                "limits remain active. The normal 2-second hold and repeat " +
+                "interval still apply. This is your personal warning ceiling, " +
+                "not a statement of the legal speed limit.", 14, false);
+        layout.addView(explanation);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Universal Speed Limit")
+                .setView(layout)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", null)
+                .create();
+        dialog.setOnShowListener(d ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    try {
+                        float value = Float.parseFloat(limit.getText().toString().trim());
+                        if (!Float.isFinite(value) || value < 5 || value > 200)
+                            throw new NumberFormatException();
+                        settings.edit()
+                                .putBoolean(SpeedMonitorService.KEY_UNIVERSAL_ENABLED,
+                                        enabled.isChecked())
+                                .putFloat(SpeedMonitorService.KEY_UNIVERSAL_KPH, value)
+                                .apply();
+                        updateUniversalButton();
+                        toast(enabled.isChecked()
+                                ? String.format(Locale.US,
+                                        "Universal ceiling active at %.0f km/h", value)
+                                : "Universal speed ceiling disabled");
+                        // SpeedMonitorService reads settings on every GPS fix,
+                        // so changes take effect without stopping monitoring.
+                        dialog.dismiss();
+                    } catch (NumberFormatException invalid) {
+                        limit.setError("Enter a speed between 5 and 200 km/h");
+                    }
+                }));
         dialog.show();
     }
 
@@ -823,7 +1253,7 @@ public final class MainActivity extends Activity {
                 }).show();
     }
 
-    private void saveEditedRoads(List<RoadSegment> roads) {
+    private boolean saveEditedRoads(List<RoadSegment> roads) {
         try {
             LocalRoadStore.save(this, roads);
             refreshCsvInfo();
@@ -831,15 +1261,251 @@ public final class MainActivity extends Activity {
                 startService(new Intent(this, SpeedMonitorService.class).setAction(SpeedMonitorService.ACTION_RELOAD));
             }
             toast("Road changes saved");
+            return true;
         }
-        catch(IOException ex) { toast("Save failed: "+ex.getMessage()); }
+        catch(IOException ex) { toast("Save failed: "+ex.getMessage()); return false; }
+    }
+
+    private void showProfileManager() {
+        if (quickSaving) {
+            toast("Finish the current road save before switching CSV profiles");
+            return;
+        }
+        final List<RoadProfileStore.Profile> profiles;
+        final String activeId;
+        try {
+            profiles = RoadProfileStore.list(this);
+            activeId = RoadProfileStore.activeId(this);
+        } catch (IOException ex) {
+            toast("Cannot open CSV profiles: " + ex.getMessage());
+            return;
+        }
+        if (profiles.isEmpty()) {
+            toast("No road CSV profiles found");
+            return;
+        }
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(16), dp(8), dp(16), dp(8));
+        TextView note = label("Each profile has its own road-limit CSV. Select the driver or vehicle " +
+                "before starting your trip. Universal and unmapped-road settings remain app-wide.", 14, false);
+        layout.addView(note);
+
+        android.widget.Spinner picker = new android.widget.Spinner(this);
+        List<String> choices = new ArrayList<>();
+        int activeIndex = 0;
+        for (int i = 0; i < profiles.size(); i++) {
+            RoadProfileStore.Profile profile = profiles.get(i);
+            if (profile.id.equals(activeId)) activeIndex = i;
+            choices.add(profile.name + (profile.id.equals(activeId) ? "  ✓ ACTIVE" : ""));
+        }
+        android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, choices);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        picker.setAdapter(adapter);
+        picker.setSelection(activeIndex);
+        layout.addView(picker);
+
+        TextView info = label("Tap USE SELECTED to activate. Import replaces only the active CSV. " +
+                "Use IMPORT NEW for a separate copy.", 13, false);
+        layout.addView(info);
+
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("CSV Profiles")
+                .setView(layout)
+                .setNegativeButton("Close", null)
+                .create();
+
+        LinearLayout line1 = new LinearLayout(this);
+        addProfileAction(line1, "USE SELECTED", () -> {
+            try {
+                String id = profiles.get(picker.getSelectedItemPosition()).id;
+                if (id.equals(RoadProfileStore.activeId(this))) {
+                    toast("This CSV is already active");
+                    return;
+                }
+                RoadProfileStore.select(this, id);
+                refreshCsvInfo();
+                reloadLiveRoads();
+                dialog.dismiss();
+                toast("Using CSV: " + RoadProfileStore.active(this).name);
+            } catch (Exception ex) {
+                toast("Could not switch CSV: " + ex.getMessage());
+            }
+        });
+        addProfileAction(line1, "COPY SELECTED", () -> {
+            RoadProfileStore.Profile source = profiles.get(picker.getSelectedItemPosition());
+            dialog.dismiss();
+            askProfileName("Copy CSV profile", source.name + " copy", name -> {
+                RoadProfileStore.Profile copied = RoadProfileStore.duplicate(
+                        this, source.id, name);
+                toast("Created independent CSV: " + copied.name);
+                showProfileManager();
+            });
+        });
+        layout.addView(line1);
+
+        LinearLayout line2 = new LinearLayout(this);
+        addProfileAction(line2, "IMPORT NEW", () -> {
+            dialog.dismiss();
+            askProfileName("Import as a new CSV profile", "", name -> {
+                pendingImportNewName = name;
+                openCsvPicker(REQ_IMPORT_NEW_PROFILE);
+            });
+        });
+        addProfileAction(line2, "RENAME", () -> {
+            RoadProfileStore.Profile selected = profiles.get(picker.getSelectedItemPosition());
+            dialog.dismiss();
+            askProfileName("Rename CSV profile", selected.name, name -> {
+                RoadProfileStore.rename(this, selected.id, name);
+                refreshCsvInfo();
+                showProfileManager();
+            });
+        });
+        layout.addView(line2);
+
+        LinearLayout line3 = new LinearLayout(this);
+        addProfileAction(line3, "SHARE CSV", () -> {
+            try {
+                RoadProfileStore.Profile selected = profiles.get(picker.getSelectedItemPosition());
+                shareRoadProfile(selected);
+            } catch (Exception ex) {
+                toast("Cannot share CSV: " + ex.getMessage());
+            }
+        });
+        addProfileAction(line3, "DELETE", () -> {
+            RoadProfileStore.Profile selected = profiles.get(picker.getSelectedItemPosition());
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete CSV profile?")
+                    .setMessage("Delete \"" + selected.name +
+                            "\" and its saved road limits from this phone? " +
+                            "This cannot be undone. The active CSV cannot be deleted.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Delete", (d, w) -> {
+                        try {
+                            RoadProfileStore.delete(this, selected.id);
+                            dialog.dismiss();
+                            toast("Deleted profile: " + selected.name);
+                            showProfileManager();
+                        } catch (Exception ex) {
+                            toast("Cannot delete: " + ex.getMessage());
+                        }
+                    }).show();
+        });
+        layout.addView(line3);
+        dialog.show();
+    }
+
+    private void addProfileAction(LinearLayout row, String caption, Runnable action) {
+        Button button = new Button(this);
+        button.setText(caption);
+        button.setTextSize(12);
+        button.setOnClickListener(v -> action.run());
+        row.addView(button, new LinearLayout.LayoutParams(0, dp(55), 1));
+    }
+
+    private interface ProfileNameAction {
+        void accept(String name) throws IOException;
+    }
+
+    private void askProfileName(String title, String defaultName, ProfileNameAction action) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Profile name, e.g. Thar / Driver");
+        input.setText(defaultName);
+        input.setSelectAllOnFocus(true);
+        LinearLayout box = new LinearLayout(this);
+        box.setPadding(dp(20), dp(4), dp(20), dp(4));
+        box.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(box)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Continue", null)
+                .create();
+        dialog.setOnShowListener(d ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    try {
+                        String value = RoadProfileNames.checked(input.getText().toString());
+                        action.accept(value);
+                        dialog.dismiss();
+                    } catch (Exception ex) {
+                        input.setError(ex.getMessage());
+                    }
+                }));
+        dialog.show();
+    }
+
+    private void shareRoadProfile(RoadProfileStore.Profile profile) throws IOException {
+        java.io.File original = RoadProfileStore.fileFor(this, profile.id);
+        java.io.File sharedDir = new java.io.File(getCacheDir(), "profile_shares");
+        if (!sharedDir.isDirectory() && !sharedDir.mkdirs())
+            throw new IOException("Could not prepare CSV sharing");
+        // Do not expose the live writable profile; send an independent snapshot.
+        // Retain recent shares so recipient applications can read them later.
+        java.io.File[] previous = sharedDir.listFiles();
+        if (previous != null) {
+            for (java.io.File old : previous) {
+                if (old.isFile() && System.currentTimeMillis() - old.lastModified()
+                        > 7L * 24 * 60 * 60 * 1000) old.delete();
+            }
+        }
+        String safe = profile.name.replaceAll("[^a-zA-Z0-9_-]", "_");
+        java.io.File snapshot = new java.io.File(sharedDir,
+                "speedbeep_" + safe + "_" + System.currentTimeMillis() + ".csv");
+        try (InputStream in = new java.io.FileInputStream(original);
+             OutputStream out = new java.io.FileOutputStream(snapshot)) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+            out.flush();
+        } catch (IOException failure) {
+            snapshot.delete();
+            throw failure;
+        }
+        Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                this, getPackageName() + ".fileprovider", snapshot);
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/csv");
+        send.putExtra(Intent.EXTRA_STREAM, uri);
+        send.putExtra(Intent.EXTRA_SUBJECT, "SpeedBeep CSV: " + profile.name);
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        send.setClipData(android.content.ClipData.newRawUri("SpeedBeep road limits", uri));
+        startActivity(Intent.createChooser(send, "Share " + profile.name + " CSV"));
+    }
+
+    private void reloadLiveRoads() {
+        if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE)
+                .getBoolean("running", false)) {
+            startService(new Intent(this, SpeedMonitorService.class)
+                    .setAction(SpeedMonitorService.ACTION_RELOAD));
+        }
+    }
+
+    private void openCsvPicker(int requestCode) {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("text/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[]{"text/csv", "text/plain", "application/vnd.ms-excel",
+                        "application/octet-stream"});
+        startActivityForResult(i, requestCode);
     }
 
     private void chooseCsv() {
-        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        i.addCategory(Intent.CATEGORY_OPENABLE);
-        i.setType("*/*");
-        startActivityForResult(i, REQ_IMPORT);
+        if (quickSaving) {
+            toast("Finish saving the road limit first");
+            return;
+        }
+        try {
+            pendingImportProfileId = RoadProfileStore.activeId(this);
+            openCsvPicker(REQ_IMPORT);
+        } catch (IOException ex) {
+            toast("CSV profile error: " + ex.getMessage());
+        }
     }
 
     private void exportCsv() {
@@ -850,26 +1516,57 @@ public final class MainActivity extends Activity {
         Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("text/csv");
-        i.putExtra(Intent.EXTRA_TITLE, "speed_limits.csv");
+        try {
+            RoadProfileStore.Profile profile = RoadProfileStore.active(this);
+            pendingExportProfileId = profile.id;
+            String safe = profile.name.replaceAll("[^a-zA-Z0-9_-]", "_");
+            i.putExtra(Intent.EXTRA_TITLE, "speedbeep_" + safe + ".csv");
+        } catch (IOException ex) {
+            toast("CSV profile error: " + ex.getMessage());
+            return;
+        }
         startActivityForResult(i, REQ_EXPORT);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            if (requestCode == REQ_IMPORT) pendingImportProfileId = null;
+            if (requestCode == REQ_IMPORT_NEW_PROFILE) pendingImportNewName = null;
+            if (requestCode == REQ_EXPORT) pendingExportProfileId = null;
+            return;
+        }
         Uri uri = data.getData();
         if (requestCode == REQ_IMPORT) {
+            String destinationId = pendingImportProfileId;
+            pendingImportProfileId = null;
             try (InputStream in = getContentResolver().openInputStream(uri)) {
-                if (in == null) throw new IOException("Could not open selected file");
-                int count = LocalRoadStore.importCsv(this, in);
-                toast("Imported " + count + " road segments");
-                refreshCsvInfo();
-                if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE).getBoolean("running", false)) {
-                    startService(new Intent(this, SpeedMonitorService.class).setAction(SpeedMonitorService.ACTION_RELOAD));
+                if (in == null || destinationId == null)
+                    throw new IOException("CSV import target unavailable");
+                int count = LocalRoadStore.importCsvForProfile(this, destinationId, in);
+                toast("Replaced " + count + " road segments in selected CSV profile");
+                if (destinationId.equals(RoadProfileStore.activeId(this))) {
+                    refreshCsvInfo();
+                    reloadLiveRoads();
                 }
             } catch (Exception ex) {
-                toast("Import failed: " + ex.getMessage());
+                toast("CSV import failed: " + ex.getMessage());
+            }
+        } else if (requestCode == REQ_IMPORT_NEW_PROFILE) {
+            String newName = pendingImportNewName;
+            pendingImportNewName = null;
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null || newName == null)
+                    throw new IOException("CSV profile name or import file missing");
+                RoadProfileStore.Profile created =
+                        RoadProfileStore.createImported(this, newName, in);
+                RoadProfileStore.select(this, created.id);
+                refreshCsvInfo();
+                reloadLiveRoads();
+                toast("Imported and activated new CSV: " + created.name);
+            } catch (Exception ex) {
+                toast("New profile import failed: " + ex.getMessage());
             }
         } else if (requestCode == REQ_LOG_EXPORT) {
             try (InputStream in = new java.io.FileInputStream(DriveLog.file(this));
@@ -881,16 +1578,20 @@ public final class MainActivity extends Activity {
                 toast("Drive diagnostics exported");
             } catch (Exception ex) { toast("Export failed: " + ex.getMessage()); }
         } else if (requestCode == REQ_EXPORT) {
+            String id = pendingExportProfileId;
+            pendingExportProfileId = null;
             try {
-                LocalRoadStore.ensureSeedFile(this);
-                try (InputStream in = new java.io.FileInputStream(LocalRoadStore.file(this)); OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (id == null) throw new IOException("CSV export profile is missing");
+                try (InputStream in = new java.io.FileInputStream(
+                        RoadProfileStore.fileFor(this, id));
+                     OutputStream out = getContentResolver().openOutputStream(uri)) {
                     if (out == null) throw new IOException("Could not create output file");
                     byte[] buffer = new byte[8192];
                     int n;
-                    while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);
+                    while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
                     out.flush();
                 }
-                toast("CSV exported");
+                toast("Selected CSV profile exported");
             } catch (Exception ex) {
                 toast("Export failed: " + ex.getMessage());
             }
@@ -923,8 +1624,13 @@ public final class MainActivity extends Activity {
             evaluatedFixTime = -1L;
             tripMap.setRoads(roads);
             updateQuickRoadStatus();
-            csvText.setText("CSV: " + roads.size() + " road segment" + (roads.size() == 1 ? "" : "s") + " loaded");
+            RoadProfileStore.Profile active = RoadProfileStore.active(this);
+            if (activeProfileText != null)
+                activeProfileText.setText("Active CSV: " + active.name);
+            csvText.setText(active.name + ": " + roads.size() + " road segment" +
+                    (roads.size() == 1 ? "" : "s") + " loaded");
         } catch (IOException ex) {
+            if (activeProfileText != null) activeProfileText.setText("CSV profile error");
             csvText.setText("CSV ERROR: " + ex.getMessage());
         }
     }
@@ -944,20 +1650,33 @@ public final class MainActivity extends Activity {
             note = "WARNING: no GPS updates for over 15 seconds";
         }
 
-        float latitude = p.getFloat("latitude", Float.NaN);
-        float longitude = p.getFloat("longitude", Float.NaN);
-        if (!Float.isNaN(latitude) && !Float.isNaN(longitude)) tripMap.setPosition(latitude, longitude);
-        if (System.currentTimeMillis() - lastMapReload > 5000) {
-            lastMapReload = System.currentTimeMillis();
-            tripMap.reloadTrip();
+        if (mapDialog != null && mapDialog.isShowing()) {
+            double[] fix = recentMapPosition();
+            if (fix != null) {
+                tripMap.setPosition(fix[0], fix[1]);
+                if (followMapGps) tripMap.followPosition(fix[0], fix[1]);
+            }
+            if (System.currentTimeMillis() - lastMapReload > 5000) {
+                lastMapReload = System.currentTimeMillis();
+                tripMap.reloadTrip();
+            }
         }
         bigSpeed.setText(running ? String.format(Locale.US, "%.0f", speed) : "—");
         roadText.setText(road == null || road.isEmpty() ? "Road: —" : "Road: " + road);
-        limitText.setText(limit > 0 ? String.format(Locale.US, "Limit: %.0f km/h  (+%.0f)", limit, margin) : "Limit: —");
+        limitText.setText(limit > 0
+                ? String.format(Locale.US, "Road limit: %.0f km/h (+%.0f)", limit, margin)
+                : "Road limit: —");
+        updateUniversalButton();
         if (running) {
             String gps = accuracy > 0 ? String.format(Locale.US, "GPS ±%.0f m", accuracy) : "GPS";
             String match = road != null && !road.isEmpty() ? String.format(Locale.US, " • road distance %.0f m", distance) : "";
-            detailText.setText(note + " • " + gps + match);
+            String source = p.getString("effectiveSource", "NONE");
+            float threshold = p.getFloat("effectiveThresholdKph", 0f);
+            String trigger = threshold > 0
+                    ? String.format(Locale.US, " • trigger: %.0f km/h (%s)",
+                            threshold, source.toLowerCase(Locale.US))
+                    : "";
+            detailText.setText(note + trigger + " • " + gps + match);
         } else {
             detailText.setText(note == null || note.isEmpty() ? "Stopped" : note);
         }
@@ -970,17 +1689,20 @@ public final class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
-        tripMap.onResume();
+        if (mapDialog != null && mapDialog.isShowing()) tripMap.onResume();
         beginQuickGps();
         handler.post(refreshRunnable);
     }
     @Override protected void onPause() {
         handler.removeCallbacks(refreshRunnable);
         endQuickGps();
-        tripMap.onPause();
+        if (mapDialog != null && mapDialog.isShowing()) tripMap.onPause();
         super.onPause();
     }
     @Override protected void onDestroy() {
+        if (mapDialog != null) mapDialog.dismiss();
+        tripMap.dispose();
+        tripMap.onDetach();
         editExecutor.shutdown();
         super.onDestroy();
     }
