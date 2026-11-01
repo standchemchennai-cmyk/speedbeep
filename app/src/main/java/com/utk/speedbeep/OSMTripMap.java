@@ -16,6 +16,7 @@ import org.osmdroid.views.overlay.CopyrightOverlay;
 import org.osmdroid.views.overlay.MapEventsOverlay;
 import org.osmdroid.views.overlay.Marker;
 import org.osmdroid.views.overlay.Overlay;
+import org.osmdroid.views.overlay.Polyline;
 import org.osmdroid.events.MapEventsReceiver;
 
 import java.io.BufferedReader;
@@ -38,6 +39,7 @@ public final class OSMTripMap extends MapView {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final List<Marker> editMarkers = new ArrayList<>();
     private Marker position;
+    private Polyline routePreview;
     private double positionLat = Double.NaN, positionLon = Double.NaN;
     private double followedLat = Double.NaN, followedLon = Double.NaN;
     private volatile boolean readingLog = false;
@@ -110,6 +112,32 @@ public final class OSMTripMap extends MapView {
         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         editMarkers.add(marker);
         getOverlays().add(marker);
+        invalidate();
+    }
+
+    /** One highlighted geometry preview, so the user checks bends before saving. */
+    public void showRoutePreview(List<RoadSegment> segments) {
+        clearRoutePreview();
+        if (segments == null || segments.isEmpty()) return;
+        List<GeoPoint> points = new ArrayList<>();
+        RoadSegment first = segments.get(0);
+        points.add(new GeoPoint(first.startLat, first.startLon));
+        for (RoadSegment part : segments) {
+            points.add(new GeoPoint(part.endLat, part.endLon));
+        }
+        routePreview = new Polyline();
+        routePreview.setPoints(points);
+        routePreview.getOutlinePaint().setColor(Color.rgb(255, 161, 20));
+        routePreview.getOutlinePaint().setStrokeWidth(13f);
+        routePreview.setTitle("Preview: selected road stretch");
+        getOverlays().add(routePreview);
+        invalidate();
+    }
+
+    public void clearRoutePreview() {
+        if (routePreview == null) return;
+        getOverlays().remove(routePreview);
+        routePreview = null;
         invalidate();
     }
 
