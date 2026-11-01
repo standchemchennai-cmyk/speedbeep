@@ -48,6 +48,12 @@ public final class OSMTripMap extends MapView {
 
     public OSMTripMap(Context context) {
         super(context);
+        // A Dialog removes this view from its window on every close. osmdroid
+        // otherwise calls onDetach(), permanently shutting down tile providers
+        // and leaving blank tiles when this same map is shown a second time.
+        // Keep tile providers alive across dialog open/close; MainActivity
+        // explicitly calls onDetach() when the activity is destroyed.
+        setDestroyMode(false);
         setTileSource(TileSourceFactory.MAPNIK);
         setMultiTouchControls(true);
         setBuiltInZoomControls(false);
