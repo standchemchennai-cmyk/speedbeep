@@ -29,6 +29,7 @@ public final class RoadProfileStore {
     private static final String LABEL_PREFIX = "label_";
     private static final String DEFAULT_ID = "default";
     private static final String DIRECTORY = "road_profiles";
+    private static final long MAX_IMPORT_BYTES = 20L * 1024L * 1024L;
     private static final Object LOCK = new Object();
 
     public static final class Profile {
@@ -61,7 +62,13 @@ public final class RoadProfileStore {
         try (FileOutputStream stream = new FileOutputStream(out)) {
             byte[] bytes = new byte[8192];
             int read;
-            while ((read = in.read(bytes)) != -1) stream.write(bytes, 0, read);
+            long total = 0;
+            while ((read = in.read(bytes)) != -1) {
+                total += read;
+                if (total > MAX_IMPORT_BYTES)
+                    throw new IOException("CSV profile exceeds 20 MB");
+                stream.write(bytes, 0, read);
+            }
             stream.getFD().sync();
         }
     }
