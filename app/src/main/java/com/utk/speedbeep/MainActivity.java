@@ -752,10 +752,16 @@ public final class MainActivity extends Activity {
         // Loading and connected-graph search can be expensive; NEVER block map gestures.
         if (mapStatusLabel != null)
             mapStatusLabel.setText("Finding connected road geometry…");
+        final java.util.concurrent.atomic.AtomicBoolean cancelled =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
         final android.app.AlertDialog progress = new AlertDialog.Builder(this)
                 .setTitle("Snapping road stretch")
                 .setMessage("Following the mapped road between your two taps…")
-                .setCancelable(false)
+                .setNegativeButton("Cancel", (d, w) -> {
+                    cancelled.set(true);
+                    if (mapStatusLabel != null)
+                        mapStatusLabel.setText("Road selection cancelled; no changes saved.");
+                })
                 .create();
         progress.show();
         editExecutor.execute(() -> {
@@ -781,7 +787,7 @@ public final class MainActivity extends Activity {
             final String problem = error;
             runOnUiThread(() -> {
                 progress.dismiss();
-                if (isFinishing() || isDestroyed()) return;
+                if (isFinishing() || isDestroyed() || cancelled.get()) return;
                 if (problem != null || route == null || snapshot == null) {
                     String message = problem == null ? "Could not snap road stretch" : problem;
                     if (mapStatusLabel != null) mapStatusLabel.setText("Not saved: " + message);
