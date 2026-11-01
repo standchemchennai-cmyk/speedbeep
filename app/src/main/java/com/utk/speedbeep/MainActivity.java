@@ -1440,9 +1440,34 @@ public final class MainActivity extends Activity {
     }
 
     private void shareRoadProfile(RoadProfileStore.Profile profile) throws IOException {
-        java.io.File file = RoadProfileStore.fileFor(this, profile.id);
+        java.io.File original = RoadProfileStore.fileFor(this, profile.id);
+        java.io.File sharedDir = new java.io.File(getCacheDir(), "profile_shares");
+        if (!sharedDir.isDirectory() && !sharedDir.mkdirs())
+            throw new IOException("Could not prepare CSV sharing");
+        // Do not expose the live writable profile; send an independent snapshot.
+        // Retain recent shares so recipient applications can read them later.
+        java.io.File[] previous = sharedDir.listFiles();
+        if (previous != null) {
+            for (java.io.File old : previous) {
+                if (old.isFile() && System.currentTimeMillis() - old.lastModified()
+                        > 7L * 24 * 60 * 60 * 1000) old.delete();
+            }
+        }
+        String safe = profile.name.replaceAll("[^a-zA-Z0-9_-]", "_");
+        java.io.File snapshot = new java.io.File(sharedDir,
+                "speedbeep_" + safe + "_" + System.currentTimeMillis() + ".csv");
+        try (InputStream in = new java.io.FileInputStream(original);
+             OutputStream out = new java.io.FileOutputStream(snapshot)) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+            out.flush();
+        } catch (IOException failure) {
+            snapshot.delete();
+            throw failure;
+        }
         Uri uri = androidx.core.content.FileProvider.getUriForFile(
-                this, getPackageName() + ".fileprovider", file);
+                this, getPackageName() + ".fileprovider", snapshot);
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType("text/csv");
         send.putExtra(Intent.EXTRA_STREAM, uri);
