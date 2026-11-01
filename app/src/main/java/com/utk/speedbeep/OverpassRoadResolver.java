@@ -129,6 +129,54 @@ public final class OverpassRoadResolver {
         return new Result(selected.roadName(), connected, closest.distanceM, extended);
     }
 
+    /**
+     * Map-editor fallback for roads not represented by the speed-limit CSV.
+     * The public map tiles are pictures, not traversable road geometry.
+     * Read explicit drivable OSM ways on demand and route *along* their nodes;
+     * never infer a straight shortcut between the user's taps.
+     */
+    public static MapStretchRouter.Route routeMapStretch(
+            double startLat, double startLon, double endLat, double endLon) throws IOException {
+        double distanceM = Math.hypot((startLat - endLat) * 111320,
+                (startLon - endLon) * 111320 *
+                        Math.cos(Math.toRadians((startLat + endLat) * .5)));
+        if (!Double.isFinite(distanceM) || distanceM > 4000)
+            throw new IOException("Choose map stretches shorter than 4 km");
+        // The buffer captures road curves without downloading an entire city.
+        double paddingM = Math.max(180, Math.min(600, distanceM * .35));
+        double latPad = paddingM / 111320;
+        double lonPad = paddingM /
+                (111320 * Math.max(.1, Math.cos(Math.toRadians((startLat + endLat) * .5))));
+        double south = Math.min(startLat, endLat) - latPad;
+        double north = Math.max(startLat, endLat) + latPad;
+        double west = Math.min(startLon, endLon) - lonPad;
+        double east = Math.max(startLon, endLon) + lonPad;
+        String query = String.format(Locale.US,
+                "[out:json][timeout:25];way[\\\"highway\\\"~\\\"%s\\\"]" +
+                        "(%.7f,%.7f,%.7f,%.7f);out tags geom;",
+                MOTOR_ROADS, south, west, north, east);
+        List<OSMRoadNetwork.Way> ways = request(query);
+        List<RoadSegment> geometry = new ArrayList<>();
+        for (OSMRoadNetwork.Way way : ways) {
+            if (way.points == null || way.points.size() < 2) continue;
+            for (int i = 1; i < way.points.size(); i++) {
+                double[] a = way.points.get(i - 1), b = way.points.get(i);
+                RoadSegment edge = new RoadSegment(
+                        "OSM " + way.roadName() + " [way " + way.id + "]",
+                        a[0], a[1], b[0], b[1], 40, 15, 3);
+                if (RoadLimitEditor.lengthM(edge) >= .3) geometry.add(edge);
+                if (geometry.size() > 15000) throw new IOException("Road graph too large; choose a shorter stretch");
+            }
+        }
+        try {
+            return MapStretchRouter.route(geometry, startLat, startLon,
+                    endLat, endLon, true);
+        } catch (IllegalArgumentException ex) {
+            throw new RoadNotFoundException("Could not snap both points onto the same connected OSM road: "
+                    + ex.getMessage());
+        }
+    }
+
     private static String escapeTag(String value) {
         String out = value.replace("\\", "\\\\").replace("\"", "\\\"");
         return out.replace("\n", " ").replace("\r", " ").replace("\t", " ");
