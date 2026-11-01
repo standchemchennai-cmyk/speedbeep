@@ -52,11 +52,13 @@ public final class MainActivity extends Activity {
     private TextView bigSpeed;
     private TextView roadText;
     private TextView limitText;
+    private TextView universalStatusText;
     private TextView detailText;
     private TextView csvText;
     private Button startButton;
     private Button stopButton;
     private Button alarmButton;
+    private Button universalButton;
     private EditText quickLimitInput;
     private TextView quickRoadHint;
     private TextView quickSavedHint;
@@ -142,6 +144,8 @@ public final class MainActivity extends Activity {
         detailText.setPadding(0, dp(8), 0, dp(16));
         root.addView(roadText);
         root.addView(limitText);
+        universalStatusText = label("Universal ceiling: OFF", 18, true);
+        root.addView(universalStatusText);
         root.addView(detailText);
 
         LinearLayout buttons = new LinearLayout(this);
@@ -205,6 +209,13 @@ public final class MainActivity extends Activity {
         alarmButton.setOnClickListener(v -> showAlarmSettings());
         updateAlarmButton();
         root.addView(alarmButton);
+
+        // Separate from the user-defined unmapped-road fallback. This ceiling
+        // applies on every reliable GPS fix, even if no road is matched.
+        universalButton = new Button(this);
+        universalButton.setOnClickListener(v -> showUniversalSettings());
+        root.addView(universalButton);
+        updateUniversalButton();
 
         Button fallbackButton = new Button(this);
         fallbackButton.setText("UNMAPPED ROAD SPEED SETTINGS");
@@ -1075,6 +1086,81 @@ public final class MainActivity extends Activity {
         dialog.show();
     }
 
+    private void updateUniversalButton() {
+        SharedPreferences p = getSharedPreferences(SpeedMonitorService.SETTINGS, MODE_PRIVATE);
+        boolean enabled = p.getBoolean(SpeedMonitorService.KEY_UNIVERSAL_ENABLED, false);
+        float kph = p.getFloat(SpeedMonitorService.KEY_UNIVERSAL_KPH, 60f);
+        if (universalButton != null) universalButton.setText(enabled
+                ? String.format(Locale.US, "UNIVERSAL SPEED LIMIT: ON (%.0f km/h)", kph)
+                : "UNIVERSAL SPEED LIMIT: OFF");
+        if (universalStatusText != null) universalStatusText.setText(enabled
+                ? String.format(Locale.US, "Universal ceiling: %.0f km/h (ON, everywhere)", kph)
+                : "Universal ceiling: OFF");
+    }
+
+    private void showUniversalSettings() {
+        SharedPreferences settings = getSharedPreferences(
+                SpeedMonitorService.SETTINGS, MODE_PRIVATE);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(20), dp(8), dp(20), dp(8));
+
+        CheckBox enabled = new CheckBox(this);
+        enabled.setText("Enable a universal speed ceiling on every road");
+        enabled.setChecked(settings.getBoolean(
+                SpeedMonitorService.KEY_UNIVERSAL_ENABLED, false));
+        layout.addView(enabled);
+
+        EditText limit = new EditText(this);
+        limit.setSingleLine(true);
+        limit.setHint("Maximum speed in km/h (5–200)");
+        limit.setInputType(InputType.TYPE_CLASS_NUMBER |
+                InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        limit.setText(String.valueOf((int) settings.getFloat(
+                SpeedMonitorService.KEY_UNIVERSAL_KPH, 60f)));
+        layout.addView(limit);
+
+        TextView explanation = label(
+                "Independent of mapped limits and the unmapped-road fallback. " +
+                "If enabled, the alarm triggers above this speed anywhere GPS " +
+                "is reliable, without an extra tolerance. Existing lower road " +
+                "limits remain active. The normal 2-second hold and repeat " +
+                "interval still apply. This is your personal warning ceiling, " +
+                "not a statement of the legal speed limit.", 14, false);
+        layout.addView(explanation);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Universal Speed Limit")
+                .setView(layout)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", null)
+                .create();
+        dialog.setOnShowListener(d ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    try {
+                        float value = Float.parseFloat(limit.getText().toString().trim());
+                        if (!Float.isFinite(value) || value < 5 || value > 200)
+                            throw new NumberFormatException();
+                        settings.edit()
+                                .putBoolean(SpeedMonitorService.KEY_UNIVERSAL_ENABLED,
+                                        enabled.isChecked())
+                                .putFloat(SpeedMonitorService.KEY_UNIVERSAL_KPH, value)
+                                .apply();
+                        updateUniversalButton();
+                        toast(enabled.isChecked()
+                                ? String.format(Locale.US,
+                                        "Universal ceiling active at %.0f km/h", value)
+                                : "Universal speed ceiling disabled");
+                        // SpeedMonitorService reads settings on every GPS fix,
+                        // so changes take effect without stopping monitoring.
+                        dialog.dismiss();
+                    } catch (NumberFormatException invalid) {
+                        limit.setError("Enter a speed between 5 and 200 km/h");
+                    }
+                }));
+        dialog.show();
+    }
+
     private void showFallbackSettings() {
         if (!editingAllowed()) return;
         SharedPreferences p = getSharedPreferences(SpeedMonitorService.SETTINGS, MODE_PRIVATE);
@@ -1280,11 +1366,20 @@ public final class MainActivity extends Activity {
         }
         bigSpeed.setText(running ? String.format(Locale.US, "%.0f", speed) : "—");
         roadText.setText(road == null || road.isEmpty() ? "Road: —" : "Road: " + road);
-        limitText.setText(limit > 0 ? String.format(Locale.US, "Limit: %.0f km/h  (+%.0f)", limit, margin) : "Limit: —");
+        limitText.setText(limit > 0
+                ? String.format(Locale.US, "Road limit: %.0f km/h (+%.0f)", limit, margin)
+                : "Road limit: —");
+        updateUniversalButton();
         if (running) {
             String gps = accuracy > 0 ? String.format(Locale.US, "GPS ±%.0f m", accuracy) : "GPS";
             String match = road != null && !road.isEmpty() ? String.format(Locale.US, " • road distance %.0f m", distance) : "";
-            detailText.setText(note + " • " + gps + match);
+            String source = p.getString("effectiveSource", "NONE");
+            float threshold = p.getFloat("effectiveThresholdKph", 0f);
+            String trigger = threshold > 0
+                    ? String.format(Locale.US, " • trigger: %.0f km/h (%s)",
+                            threshold, source.toLowerCase(Locale.US))
+                    : "";
+            detailText.setText(note + trigger + " • " + gps + match);
         } else {
             detailText.setText(note == null || note.isEmpty() ? "Stopped" : note);
         }
