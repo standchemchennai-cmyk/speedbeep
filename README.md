@@ -1,5 +1,21 @@
 # SpeedBeep
 
+## Online CSV source modes (0.5.0)
+
+The repository is public and the master CSV is `speed_limits.csv` at the root of `main`.
+Open **CSV SOURCE** to choose between:
+
+1. **Vanilla GitHub CSV (read-only):** use the GitHub master without local speed-limit modifications.
+2. **Vanilla + local overrides:** combine the latest master with road-limit edits stored separately for the selected named profile. Local edits take precedence on the same road geometry and survive a refreshed master. Changes to the master are never uploaded from the phone.
+3. **Standalone local CSV:** use the selected standalone profile without central merging (the pre-0.5.0 behaviour).
+
+On every foreground opening SpeedBeep starts a non-blocking download of the public master CSV. **REFRESH GITHUB MASTER CSV NOW** does the same manually. The downloaded file must parse successfully and pass size/integrity checks before it atomically replaces the cached master. If offline or GitHub fails, the app continues with the previously cached master, or the APK-bundled master if no cache exists. GPS speed monitoring does not use the network. If a new valid master arrives while monitoring, the effective database is reloaded automatically.
+
+**EXPORT EFFECTIVE CSV (ALL ROADS)** creates one ordinary CSV representing exactly the chosen mode, with master + overrides already merged when applicable. **SHARE CSV** on the active profile likewise sends a full usable CSV. Existing profile management (use, copy, import, rename, share and delete) remains; **USE SELECTED + MASTER** activates the selected profile's independent override layer, while **USE SELECTED** activates its standalone CSV. Copying a profile also copies its overrides. Importing an ordinary CSV selects standalone mode to avoid silently overwriting the online master or local overrides. Existing standalone profiles and manual edits are preserved on upgrade; their previous edits are not silently reclassified as online overrides.
+
+Speed limits are user-maintained and not legally authoritative; verify posted signs. An override is applied to geometrically aligned road sections. If a future master redraws a road substantially or replaces parallel-carriageway geometry, inspect the resulting effective map and exported CSV before relying on a local override.
+
+
 A tiny local-first Android speed-limit warning app.
 
 - No paid API

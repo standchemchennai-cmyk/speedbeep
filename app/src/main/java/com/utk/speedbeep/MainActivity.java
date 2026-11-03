@@ -57,9 +57,13 @@ public final class MainActivity extends Activity {
     private TextView detailText;
     private TextView csvText;
     private TextView activeProfileText;
+    private TextView onlineStatusText;
+    private final java.util.concurrent.atomic.AtomicBoolean csvRefreshRunning =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
     private String pendingImportProfileId;
     private String pendingImportNewName;
     private String pendingExportProfileId;
+    private String pendingExportMode;
     private Button startButton;
     private Button stopButton;
     private Button alarmButton;
@@ -124,7 +128,7 @@ public final class MainActivity extends Activity {
         root.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("Local CSV • GPS only • no account • no API");
+        subtitle.setText("GitHub master + offline road profiles • no account");
         subtitle.setTextSize(15);
         subtitle.setPadding(0, dp(4), 0, dp(20));
         root.addView(subtitle);
@@ -197,6 +201,19 @@ public final class MainActivity extends Activity {
 
         activeProfileText = label("Active CSV: checking…", 19, true);
         root.addView(activeProfileText);
+
+        Button csvSource = new Button(this);
+        csvSource.setText("CSV SOURCE: VANILLA / VANILLA + LOCAL / STANDALONE");
+        csvSource.setOnClickListener(v -> showCsvSourceDialog());
+        root.addView(csvSource);
+
+        Button refreshMaster = new Button(this);
+        refreshMaster.setText("REFRESH GITHUB MASTER CSV NOW");
+        refreshMaster.setOnClickListener(v -> refreshOnlineMaster());
+        root.addView(refreshMaster);
+        onlineStatusText = label("GitHub CSV: using bundled or cached copy", 13, false);
+        root.addView(onlineStatusText);
+
         Button profiles = new Button(this);
         profiles.setText("SELECT / MANAGE CSV PROFILES");
         profiles.setOnClickListener(v -> showProfileManager());
@@ -204,7 +221,7 @@ public final class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
 
         Button exportButton = new Button(this);
-        exportButton.setText("EXPORT ACTIVE CSV");
+        exportButton.setText("EXPORT EFFECTIVE CSV (ALL ROADS)");
         exportButton.setOnClickListener(v -> exportCsv());
         root.addView(exportButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
@@ -1033,7 +1050,8 @@ public final class MainActivity extends Activity {
                         double value = Double.parseDouble(limit.getText().toString().trim());
                         List<RoadSegment> result = RoadLimitEditor.override(
                                 roads, selected, value, name.getText().toString().trim());
-                        if (saveEditedRoads(result) && isMapPreview) {
+                        if (saveEditedRoads(result, selected, value,
+                                name.getText().toString().trim()) && isMapPreview) {
                             tripMap.clearRoutePreview();
                             if (mapStatusLabel != null)
                                 mapStatusLabel.setText("Snapped road limit saved. Tap EDIT STRETCH for another section.");
@@ -1240,6 +1258,10 @@ public final class MainActivity extends Activity {
                 .setView(layout).setNegativeButton("Cancel",null)
                 .setNeutralButton("Delete",(d,w)->{
                     if(roads.size()<=1){toast("Cannot delete last road");return;}
+                    if (!CentralRoadStore.MODE_LOCAL.equals(CentralRoadStore.mode(this))) {
+                        toast("Delete a segment in a standalone CSV profile; master is read-only");
+                        return;
+                    }
                     roads.remove(index);saveEditedRoads(roads);
                 }).setPositiveButton("Save",(d,w)->{
                     try {
@@ -1248,22 +1270,113 @@ public final class MainActivity extends Activity {
                         roads.set(index,new RoadSegment(name.getText().toString().trim(),
                                 original.startLat,original.startLon,original.endLat,original.endLon,
                                 v,original.corridorM,original.marginKph));
-                        saveEditedRoads(roads);
+                        saveEditedRoads(roads, java.util.Collections.singletonList(original),
+                                v, name.getText().toString().trim());
                     }catch(NumberFormatException ex){toast("Enter a name and limit 5–200");}
                 }).show();
     }
 
     private boolean saveEditedRoads(List<RoadSegment> roads) {
+        return saveEditedRoads(roads, null, 0, null);
+    }
+
+    private boolean saveEditedRoads(List<RoadSegment> roads, List<RoadSegment> selected,
+                                    double newLimit, String roadName) {
         try {
-            LocalRoadStore.save(this, roads);
-            refreshCsvInfo();
-            if (getSharedPreferences(SpeedMonitorService.PREFS, MODE_PRIVATE).getBoolean("running", false)) {
-                startService(new Intent(this, SpeedMonitorService.class).setAction(SpeedMonitorService.ACTION_RELOAD));
+            String mode = CentralRoadStore.mode(this);
+            if (CentralRoadStore.MODE_VANILLA.equals(mode))
+                throw new IOException("Vanilla is read-only. Choose Vanilla + Local Overrides first.");
+            if (CentralRoadStore.MODE_PLUS_LOCAL.equals(mode)) {
+                if (selected == null || selected.isEmpty())
+                    throw new IOException("Use road-limit editing to add local overrides");
+                CentralRoadStore.addOverride(this, RoadProfileStore.activeId(this),
+                        selected, newLimit, roadName);
+            } else {
+                LocalRoadStore.save(this, roads);
             }
+            refreshCsvInfo();
+            reloadLiveRoads();
             toast("Road changes saved");
             return true;
+        } catch (IOException | IllegalArgumentException ex) {
+            toast("Save failed: " + ex.getMessage());
+            return false;
         }
-        catch(IOException ex) { toast("Save failed: "+ex.getMessage()); return false; }
+    }
+
+    private void updateOnlineCsvStatus(String message) {
+        if (onlineStatusText != null) onlineStatusText.setText(message);
+    }
+
+    private void refreshOnlineMaster() {
+        if (!csvRefreshRunning.compareAndSet(false, true)) return;
+        updateOnlineCsvStatus("Checking GitHub master CSV… cached roads remain available.");
+        new Thread(() -> {
+            int count = 0;
+            String failure = null;
+            try {
+                count = CentralRoadStore.refreshOnline(getApplicationContext());
+            } catch (Exception ex) {
+                failure = ex.getMessage();
+            }
+            final int downloaded = count;
+            final String error = failure;
+            runOnUiThread(() -> {
+                csvRefreshRunning.set(false);
+                if (error == null) {
+                    updateOnlineCsvStatus("GitHub master updated: " + downloaded + " roads • "
+                            + java.text.DateFormat.getDateTimeInstance().format(
+                                    new java.util.Date(CentralRoadStore.lastSync(this))));
+                    if (!CentralRoadStore.MODE_LOCAL.equals(CentralRoadStore.mode(this))) {
+                        refreshCsvInfo();
+                        reloadLiveRoads();
+                    }
+                } else {
+                    updateOnlineCsvStatus("Online refresh failed: " + error
+                            + ". Using last cached/bundled master.");
+                }
+            });
+        }, "speedbeep-csv-refresh").start();
+    }
+
+    private void showCsvSourceDialog() {
+        String mode = CentralRoadStore.mode(this);
+        RadioGroup choices = new RadioGroup(this);
+        choices.setOrientation(RadioGroup.VERTICAL);
+        RadioButton vanilla = new RadioButton(this);
+        vanilla.setText("Vanilla GitHub CSV only (read-only, cached offline)");
+        vanilla.setId(View.generateViewId());
+        choices.addView(vanilla);
+        RadioButton overlay = new RadioButton(this);
+        overlay.setText("Vanilla + local overrides (separate for each selected profile)");
+        overlay.setId(View.generateViewId());
+        choices.addView(overlay);
+        RadioButton local = new RadioButton(this);
+        local.setText("Standalone local CSV profile (no central merging)");
+        local.setId(View.generateViewId());
+        choices.addView(local);
+        choices.check(CentralRoadStore.MODE_VANILLA.equals(mode) ? vanilla.getId()
+                : CentralRoadStore.MODE_PLUS_LOCAL.equals(mode) ? overlay.getId()
+                : local.getId());
+        new AlertDialog.Builder(this).setTitle("Road database source")
+                .setMessage("Both GitHub modes use the latest validated master or its offline "
+                        + "cache. Your separate local CSV profiles are never overwritten.")
+                .setView(choices)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Use selected", (dialog, which) -> {
+                    String chosen = choices.getCheckedRadioButtonId() == vanilla.getId()
+                            ? CentralRoadStore.MODE_VANILLA
+                            : choices.getCheckedRadioButtonId() == overlay.getId()
+                            ? CentralRoadStore.MODE_PLUS_LOCAL : CentralRoadStore.MODE_LOCAL;
+                    try {
+                        CentralRoadStore.selectMode(this, chosen);
+                        refreshCsvInfo();
+                        reloadLiveRoads();
+                        toast("Source: " + CentralRoadStore.modeLabel(chosen));
+                    } catch (IOException ex) {
+                        toast("Could not change CSV source: " + ex.getMessage());
+                    }
+                }).show();
     }
 
     private void showProfileManager() {
@@ -1288,8 +1401,10 @@ public final class MainActivity extends Activity {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(16), dp(8), dp(16), dp(8));
-        TextView note = label("Each profile has its own road-limit CSV. Select the driver or vehicle " +
-                "before starting your trip. Universal and unmapped-road settings remain app-wide.", 14, false);
+        TextView note = label("Each named profile has a standalone CSV and an independent "
+                + "GitHub-local override layer. USE SELECTED selects standalone mode; "
+                + "USE + MASTER combines the online vanilla database with that profile's "
+                + "local overrides. Sharing the active profile sends one merged CSV.", 14, false);
         layout.addView(note);
 
         android.widget.Spinner picker = new android.widget.Spinner(this);
@@ -1321,11 +1436,9 @@ public final class MainActivity extends Activity {
         addProfileAction(line1, "USE SELECTED", () -> {
             try {
                 String id = profiles.get(picker.getSelectedItemPosition()).id;
-                if (id.equals(RoadProfileStore.activeId(this))) {
-                    toast("This CSV is already active");
-                    return;
-                }
-                RoadProfileStore.select(this, id);
+                if (!id.equals(RoadProfileStore.activeId(this)))
+                    RoadProfileStore.select(this, id);
+                CentralRoadStore.selectMode(this, CentralRoadStore.MODE_LOCAL);
                 refreshCsvInfo();
                 reloadLiveRoads();
                 dialog.dismiss();
@@ -1340,11 +1453,28 @@ public final class MainActivity extends Activity {
             askProfileName("Copy CSV profile", source.name + " copy", name -> {
                 RoadProfileStore.Profile copied = RoadProfileStore.duplicate(
                         this, source.id, name);
+                CentralRoadStore.copyOverrides(this, source.id, copied.id);
                 toast("Created independent CSV: " + copied.name);
                 showProfileManager();
             });
         });
         layout.addView(line1);
+
+        LinearLayout onlineChoice = new LinearLayout(this);
+        addProfileAction(onlineChoice, "USE SELECTED + MASTER", () -> {
+            try {
+                String id = profiles.get(picker.getSelectedItemPosition()).id;
+                RoadProfileStore.select(this, id);
+                CentralRoadStore.selectMode(this, CentralRoadStore.MODE_PLUS_LOCAL);
+                refreshCsvInfo();
+                reloadLiveRoads();
+                dialog.dismiss();
+                toast("GitHub master + overrides for " + RoadProfileStore.active(this).name);
+            } catch (Exception ex) {
+                toast("Cannot select local overrides: " + ex.getMessage());
+            }
+        });
+        layout.addView(onlineChoice);
 
         LinearLayout line2 = new LinearLayout(this);
         addProfileAction(line2, "IMPORT NEW", () -> {
@@ -1385,6 +1515,7 @@ public final class MainActivity extends Activity {
                     .setPositiveButton("Delete", (d, w) -> {
                         try {
                             RoadProfileStore.delete(this, selected.id);
+                            CentralRoadStore.deleteOverrides(this, selected.id);
                             dialog.dismiss();
                             toast("Deleted profile: " + selected.name);
                             showProfileManager();
@@ -1440,7 +1571,7 @@ public final class MainActivity extends Activity {
     }
 
     private void shareRoadProfile(RoadProfileStore.Profile profile) throws IOException {
-        java.io.File original = RoadProfileStore.fileFor(this, profile.id);
+        RoadProfileStore.fileFor(this, profile.id);
         java.io.File sharedDir = new java.io.File(getCacheDir(), "profile_shares");
         if (!sharedDir.isDirectory() && !sharedDir.mkdirs())
             throw new IOException("Could not prepare CSV sharing");
@@ -1456,11 +1587,10 @@ public final class MainActivity extends Activity {
         String safe = profile.name.replaceAll("[^a-zA-Z0-9_-]", "_");
         java.io.File snapshot = new java.io.File(sharedDir,
                 "speedbeep_" + safe + "_" + System.currentTimeMillis() + ".csv");
-        try (InputStream in = new java.io.FileInputStream(original);
-             OutputStream out = new java.io.FileOutputStream(snapshot)) {
-            byte[] buffer = new byte[8192];
-            int n;
-            while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+        try (OutputStream out = new java.io.FileOutputStream(snapshot)) {
+            String shareMode = profile.id.equals(RoadProfileStore.activeId(this))
+                    ? CentralRoadStore.mode(this) : CentralRoadStore.MODE_LOCAL;
+            CentralRoadStore.export(this, profile.id, shareMode, out);
             out.flush();
         } catch (IOException failure) {
             snapshot.delete();
@@ -1519,6 +1649,7 @@ public final class MainActivity extends Activity {
         try {
             RoadProfileStore.Profile profile = RoadProfileStore.active(this);
             pendingExportProfileId = profile.id;
+            pendingExportMode = CentralRoadStore.mode(this);
             String safe = profile.name.replaceAll("[^a-zA-Z0-9_-]", "_");
             i.putExtra(Intent.EXTRA_TITLE, "speedbeep_" + safe + ".csv");
         } catch (IOException ex) {
@@ -1534,7 +1665,10 @@ public final class MainActivity extends Activity {
         if (resultCode != RESULT_OK || data == null || data.getData() == null) {
             if (requestCode == REQ_IMPORT) pendingImportProfileId = null;
             if (requestCode == REQ_IMPORT_NEW_PROFILE) pendingImportNewName = null;
-            if (requestCode == REQ_EXPORT) pendingExportProfileId = null;
+            if (requestCode == REQ_EXPORT) {
+                pendingExportProfileId = null;
+                pendingExportMode = null;
+            }
             return;
         }
         Uri uri = data.getData();
@@ -1545,7 +1679,8 @@ public final class MainActivity extends Activity {
                 if (in == null || destinationId == null)
                     throw new IOException("CSV import target unavailable");
                 int count = LocalRoadStore.importCsvForProfile(this, destinationId, in);
-                toast("Replaced " + count + " road segments in selected CSV profile");
+                CentralRoadStore.selectMode(this, CentralRoadStore.MODE_LOCAL);
+                toast("Imported " + count + " road segments; switched to standalone CSV");
                 if (destinationId.equals(RoadProfileStore.activeId(this))) {
                     refreshCsvInfo();
                     reloadLiveRoads();
@@ -1562,6 +1697,7 @@ public final class MainActivity extends Activity {
                 RoadProfileStore.Profile created =
                         RoadProfileStore.createImported(this, newName, in);
                 RoadProfileStore.select(this, created.id);
+                CentralRoadStore.selectMode(this, CentralRoadStore.MODE_LOCAL);
                 refreshCsvInfo();
                 reloadLiveRoads();
                 toast("Imported and activated new CSV: " + created.name);
@@ -1579,19 +1715,18 @@ public final class MainActivity extends Activity {
             } catch (Exception ex) { toast("Export failed: " + ex.getMessage()); }
         } else if (requestCode == REQ_EXPORT) {
             String id = pendingExportProfileId;
+            String sourceMode = pendingExportMode;
             pendingExportProfileId = null;
+            pendingExportMode = null;
             try {
-                if (id == null) throw new IOException("CSV export profile is missing");
-                try (InputStream in = new java.io.FileInputStream(
-                        RoadProfileStore.fileFor(this, id));
-                     OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (id == null || sourceMode == null)
+                    throw new IOException("CSV export target is missing");
+                try (OutputStream out = getContentResolver().openOutputStream(uri)) {
                     if (out == null) throw new IOException("Could not create output file");
-                    byte[] buffer = new byte[8192];
-                    int n;
-                    while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+                    CentralRoadStore.export(this, id, sourceMode, out);
                     out.flush();
                 }
-                toast("Selected CSV profile exported");
+                toast("Exported one complete CSV with all effective road segments");
             } catch (Exception ex) {
                 toast("Export failed: " + ex.getMessage());
             }
@@ -1625,9 +1760,11 @@ public final class MainActivity extends Activity {
             tripMap.setRoads(roads);
             updateQuickRoadStatus();
             RoadProfileStore.Profile active = RoadProfileStore.active(this);
+            String sourceMode = CentralRoadStore.mode(this);
+            String sourceName = CentralRoadStore.modeLabel(sourceMode);
             if (activeProfileText != null)
-                activeProfileText.setText("Active CSV: " + active.name);
-            csvText.setText(active.name + ": " + roads.size() + " road segment" +
+                activeProfileText.setText(sourceName + " • " + active.name);
+            csvText.setText(sourceName + ": " + roads.size() + " road segment" +
                     (roads.size() == 1 ? "" : "s") + " loaded");
         } catch (IOException ex) {
             if (activeProfileText != null) activeProfileText.setText("CSV profile error");
@@ -1692,6 +1829,8 @@ public final class MainActivity extends Activity {
         if (mapDialog != null && mapDialog.isShowing()) tripMap.onResume();
         beginQuickGps();
         handler.post(refreshRunnable);
+        // A fresh network check on every foreground opening. Never block GPS/UI.
+        refreshOnlineMaster();
     }
     @Override protected void onPause() {
         handler.removeCallbacks(refreshRunnable);

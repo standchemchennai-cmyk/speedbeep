@@ -63,6 +63,11 @@ public final class CsvRoadRepository {
     private static void validate(String name, double aLat, double aLon, double bLat, double bLon,
                                  double limit, double corridor, double margin) {
         if (name == null || name.trim().isEmpty()) throw new IllegalArgumentException("name is blank");
+        if (!Double.isFinite(aLat) || !Double.isFinite(aLon)
+                || !Double.isFinite(bLat) || !Double.isFinite(bLon)
+                || !Double.isFinite(limit) || !Double.isFinite(corridor)
+                || !Double.isFinite(margin))
+            throw new IllegalArgumentException("non-finite CSV value");
         if (!latOk(aLat) || !latOk(bLat)) throw new IllegalArgumentException("latitude outside -90..90");
         if (!lonOk(aLon) || !lonOk(bLon)) throw new IllegalArgumentException("longitude outside -180..180");
         if (limit < 5 || limit > 200) throw new IllegalArgumentException("limit_kph outside 5..200");
