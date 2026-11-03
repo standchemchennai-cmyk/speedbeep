@@ -36,9 +36,7 @@ public final class LocalRoadStore {
 
     public static List<RoadSegment> loadForProfile(Context context, String id)
             throws IOException {
-        try (FileInputStream in = new FileInputStream(RoadProfileStore.fileFor(context, id))) {
-            return CsvRoadRepository.read(in);
-        }
+        return CentralRoadStore.loadEffective(context, id, CentralRoadStore.mode(context));
     }
 
     public static int importCsv(Context context, InputStream incoming) throws IOException {
@@ -65,7 +63,18 @@ public final class LocalRoadStore {
             throws IOException {
         if (roads == null || roads.isEmpty())
             throw new IOException("Cannot save empty road database");
+        if (!CentralRoadStore.MODE_LOCAL.equals(CentralRoadStore.mode(context)))
+            throw new IOException("Central CSV edits must be saved as local overrides");
         File target = RoadProfileStore.fileFor(context, id);
+        byte[] content = toCsvBytes(roads);
+        parse(content);
+        atomicReplace(target, content);
+    }
+
+    /** A single portable CSV containing the final, fully merged road database. */
+    public static byte[] toCsvBytes(List<RoadSegment> roads) throws IOException {
+        if (roads == null || roads.isEmpty())
+            throw new IOException("Cannot export an empty road database");
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (OutputStreamWriter out = new OutputStreamWriter(bytes, StandardCharsets.UTF_8)) {
             out.write("name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph\n");
@@ -79,9 +88,7 @@ public final class LocalRoadStore {
                     throw new IOException("Edited road profile exceeds 20 MB");
             }
         }
-        byte[] content = bytes.toByteArray();
-        parse(content);
-        atomicReplace(target, content);
+        return bytes.toByteArray();
     }
 
     private static List<RoadSegment> parse(byte[] bytes) throws IOException {
