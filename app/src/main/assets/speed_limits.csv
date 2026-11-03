@@ -1,8 +1,7 @@
 # SpeedBeep local road database
-# Manual rows are authoritative and appear first. Generated OSM rows start with 'OSM '.
-# OSM import includes only explicit numeric maxspeed values on motor-vehicle roads.
-# OSM data © OpenStreetMap contributors, ODbL 1.0: https://www.openstreetmap.org/copyright
-# OSM coverage bbox: 12.7,79.95,13.32,80.36
+# Road-snapped routes are exported as many short straight segments for the offline Android matcher.
+# corridor_m is the matching width around each segment.
+# margin_kph is how far above the legal limit before the warning starts.
 name,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph
 Road segment 1,13.089205,80.250993,13.085928,80.250458,20,40,3
 Road segment 2,13.092389,80.240908,13.092573,80.240968,35,40,3
@@ -15,9 +14,10 @@ Road segment 2,13.087484,80.243901,13.085790,80.245221,35,40,3
 Road segment 2,13.085790,80.245221,13.085583,80.245280,35,40,3
 Road segment 2,13.085583,80.245280,13.085557,80.245167,35,40,3
 Road segment 2,13.085557,80.245167,13.085658,80.245212,35,40,3
-Road segment 3,13.085644,80.252157,13.085694,80.254399,40,40,3
-Road segment 3,13.085694,80.254399,13.085540,80.254679,40,40,3
-Road segment 3,13.085540,80.254679,13.082325,80.254470,40,40,3
+Road segment 3,13.085882,80.250584,13.085638,80.252302,40,40,3
+Road segment 3,13.085638,80.252302,13.085694,80.254399,40,40,3
+Road segment 3,13.085694,80.254399,13.085487,80.254698,40,40,3
+Road segment 3,13.085487,80.254698,13.082325,80.254470,40,40,3
 Road segment 3,13.082325,80.254470,13.081476,80.254865,40,40,3
 Road segment 3,13.081476,80.254865,13.079504,80.254587,40,40,3
 Road segment 3,13.079504,80.254587,13.078878,80.254700,40,40,3
@@ -46,18 +46,19 @@ Road segment 6,13.092487,80.240974,13.092999,80.233937,35,40,3
 Road segment 6,13.092999,80.233937,13.092706,80.232147,35,40,3
 Road segment 6,13.092706,80.232147,13.088526,80.231449,35,40,3
 Road segment 6,13.088526,80.231449,13.088605,80.231383,35,40,3
-Road segment 7,13.087682,80.234408,13.087747,80.234503,40,40,3
-Road segment 7,13.087747,80.234503,13.087923,80.234290,40,40,3
-Road segment 7,13.087923,80.234290,13.088194,80.232658,40,40,3
-Road segment 7,13.088194,80.232658,13.088553,80.231377,40,40,3
-Road segment 7,13.088553,80.231377,13.089642,80.229293,40,40,3
+Road segment 7,13.086607,80.234651,13.086619,80.234559,40,40,3
+Road segment 7,13.086619,80.234559,13.087551,80.234591,40,40,3
+Road segment 7,13.087551,80.234591,13.087852,80.234427,40,40,3
+Road segment 7,13.087852,80.234427,13.088526,80.231449,40,40,3
+Road segment 7,13.088526,80.231449,13.089642,80.229293,40,40,3
 Road segment 7,13.089642,80.229293,13.093587,80.225104,40,40,3
 Road segment 7,13.093587,80.225104,13.094950,80.223264,40,40,3
 Road segment 7,13.094950,80.223264,13.097185,80.217034,40,40,3
 Road segment 7,13.097185,80.217034,13.098327,80.214271,40,40,3
 Road segment 7,13.098327,80.214271,13.102519,80.205056,40,40,3
 Road segment 7,13.102519,80.205056,13.103002,80.204399,40,40,3
-Road segment 7,13.103002,80.204399,13.103580,80.203130,40,40,3
+Road segment 7,13.103002,80.204399,13.103522,80.203350,40,40,3
+Road segment 7,13.103522,80.203350,13.103580,80.203130,40,40,3
 Road segment 7,13.103580,80.203130,13.102971,80.198212,40,40,3
 Road segment 7,13.102971,80.198212,13.101912,80.194882,40,40,3
 Road segment 7,13.101912,80.194882,13.101509,80.194390,40,40,3
@@ -68,7 +69,7 @@ Road segment 7,13.101870,80.193534,13.101389,80.190742,40,40,3
 Road segment 7,13.101389,80.190742,13.100988,80.189529,40,40,3
 Road segment 7,13.100988,80.189529,13.100485,80.188885,40,40,3
 Road segment 7,13.100485,80.188885,13.100124,80.188122,40,40,3
-Road segment 7,13.100124,80.188122,13.099750,80.186748,40,40,3
+Road segment 7,13.100124,80.188122,13.099749,80.186748,40,40,3
 Road segment 8,13.099755,80.186594,13.099815,80.186707,35,40,3
 Road segment 8,13.099815,80.186707,13.098651,80.182741,35,40,3
 Road segment 8,13.098651,80.182741,13.097869,80.179439,35,40,3
@@ -1921,29 +1922,29 @@ OSM Taramani Link Road [way 30604310],12.981155,80.235899,12.981121,80.234897,50
 OSM Taramani Link Road [way 30604310],12.981121,80.234897,12.981124,80.234670,50,15,3
 OSM Taramani Link Road [way 30604310],12.981124,80.234670,12.981142,80.234438,50,15,3
 OSM Taramani Link Road [way 30604310],12.981142,80.234438,12.981186,80.234209,50,15,3
-OSM Porur Bridge [way 30620257],13.036426,80.149289,13.034278,80.149182,120,15,3
-OSM Porur Bridge [way 30620257],13.034278,80.149182,13.033399,80.149067,120,15,3
-OSM Porur Bridge [way 30620257],13.033399,80.149067,13.032691,80.148931,120,15,3
-OSM Porur Bridge [way 30620257],13.032691,80.148931,13.032255,80.148813,120,15,3
-OSM Chennai Bypass Expressway [way 30622251],13.049398,80.149820,13.049934,80.149936,120,15,3
-OSM Chennai Bypass Expressway [way 30622251],13.049934,80.149936,13.050480,80.150140,120,15,3
-OSM Chennai Bypass Expressway [way 30622251],13.050480,80.150140,13.050990,80.150428,120,15,3
-OSM Chennai Bypass Expressway [way 30622251],13.050990,80.150428,13.051383,80.150752,120,15,3
-OSM Chennai Bypass Expressway [way 30622251],13.051383,80.150752,13.051726,80.151094,120,15,3
-OSM Chennai Bypass Expressway [way 30622251],13.051726,80.151094,13.052079,80.151597,120,15,3
-OSM Chennai Bypass Expressway [way 30622251],13.052079,80.151597,13.052366,80.152125,120,15,3
-OSM Chennai Bypass Expressway [way 30622251],13.052366,80.152125,13.053431,80.154277,120,15,3
+OSM Porur Bridge [way 30620257],13.036426,80.149289,13.034278,80.149182,80,15,3
+OSM Porur Bridge [way 30620257],13.034278,80.149182,13.033399,80.149067,80,15,3
+OSM Porur Bridge [way 30620257],13.033399,80.149067,13.032691,80.148931,80,15,3
+OSM Porur Bridge [way 30620257],13.032691,80.148931,13.032255,80.148813,80,15,3
+OSM Chennai Bypass Expressway [way 30622251],13.049398,80.149820,13.049934,80.149936,80,15,3
+OSM Chennai Bypass Expressway [way 30622251],13.049934,80.149936,13.050480,80.150140,80,15,3
+OSM Chennai Bypass Expressway [way 30622251],13.050480,80.150140,13.050990,80.150428,80,15,3
+OSM Chennai Bypass Expressway [way 30622251],13.050990,80.150428,13.051383,80.150752,80,15,3
+OSM Chennai Bypass Expressway [way 30622251],13.051383,80.150752,13.051726,80.151094,80,15,3
+OSM Chennai Bypass Expressway [way 30622251],13.051726,80.151094,13.052079,80.151597,80,15,3
+OSM Chennai Bypass Expressway [way 30622251],13.052079,80.151597,13.052366,80.152125,80,15,3
+OSM Chennai Bypass Expressway [way 30622251],13.052366,80.152125,13.053431,80.154277,80,15,3
 OSM way 30622252 [way 30622252],13.044130,80.149738,13.044093,80.149692,40,15,3
 OSM way 30622252 [way 30622252],13.044093,80.149692,13.044076,80.149623,40,15,3
 OSM way 30622252 [way 30622252],13.044076,80.149623,13.044096,80.149563,40,15,3
 OSM way 30622252 [way 30622252],13.044096,80.149563,13.044141,80.149505,40,15,3
-OSM way 30622253 [way 30622253],13.044130,80.149738,13.043951,80.149743,100,15,3
-OSM way 30622253 [way 30622253],13.043951,80.149743,13.043600,80.149751,100,15,3
-OSM way 30622253 [way 30622253],13.043600,80.149751,13.042941,80.149676,100,15,3
-OSM way 30622254 [way 30622254],13.042942,80.149483,13.043515,80.149563,120,15,3
-OSM way 30622254 [way 30622254],13.043515,80.149563,13.043630,80.149563,120,15,3
-OSM way 30622255 [way 30622255],13.042942,80.149483,13.043516,80.149508,120,15,3
-OSM way 30622255 [way 30622255],13.043516,80.149508,13.044141,80.149505,120,15,3
+OSM way 30622253 [way 30622253],13.044130,80.149738,13.043951,80.149743,80,15,3
+OSM way 30622253 [way 30622253],13.043951,80.149743,13.043600,80.149751,80,15,3
+OSM way 30622253 [way 30622253],13.043600,80.149751,13.042941,80.149676,80,15,3
+OSM way 30622254 [way 30622254],13.042942,80.149483,13.043515,80.149563,80,15,3
+OSM way 30622254 [way 30622254],13.043515,80.149563,13.043630,80.149563,80,15,3
+OSM way 30622255 [way 30622255],13.042942,80.149483,13.043516,80.149508,80,15,3
+OSM way 30622255 [way 30622255],13.043516,80.149508,13.044141,80.149505,80,15,3
 OSM service Road to chennai Bypass [way 30622987],13.036286,80.149014,13.036440,80.148930,40,15,3
 OSM service Road to chennai Bypass [way 30622987],13.036440,80.148930,13.036600,80.148946,40,15,3
 OSM service Road to chennai Bypass [way 30622987],13.036600,80.148946,13.037061,80.149002,40,15,3
@@ -2007,15 +2008,15 @@ OSM Kennedy 1st Street [way 30921946],13.038028,80.263189,13.037963,80.263165,40
 OSM Kennedy 1st Street [way 30921946],13.037963,80.263165,13.037597,80.263119,40,15,3
 OSM Kennedy 1st Street [way 30921946],13.037597,80.263119,13.037509,80.263127,40,15,3
 OSM Kennedy 1st Street [way 30921946],13.037509,80.263127,13.037444,80.263145,40,15,3
-OSM Chennai Bypass Expressway [way 31242169],13.011900,80.127484,13.012673,80.127775,120,15,3
-OSM Chennai Bypass Expressway [way 31242169],13.012673,80.127775,13.013364,80.128120,120,15,3
-OSM Chennai Bypass Expressway [way 31242169],13.013364,80.128120,13.014100,80.128677,120,15,3
-OSM Chennai Bypass Expressway [way 31242169],13.014100,80.128677,13.014635,80.129210,120,15,3
-OSM Chennai Bypass Expressway [way 31242169],13.014635,80.129210,13.015162,80.129914,120,15,3
-OSM Chennai Bypass Expressway [way 31242169],13.015162,80.129914,13.016768,80.132025,120,15,3
-OSM Chennai Bypass Expressway [way 31242169],13.016768,80.132025,13.017646,80.133046,120,15,3
-OSM Chennai Bypass Expressway [way 31242169],13.017646,80.133046,13.019887,80.135527,120,15,3
-OSM Chennai Bypass Expressway [way 31242169],13.019887,80.135527,13.020401,80.136163,120,15,3
+OSM Chennai Bypass Expressway [way 31242169],13.011900,80.127484,13.012673,80.127775,80,15,3
+OSM Chennai Bypass Expressway [way 31242169],13.012673,80.127775,13.013364,80.128120,80,15,3
+OSM Chennai Bypass Expressway [way 31242169],13.013364,80.128120,13.014100,80.128677,80,15,3
+OSM Chennai Bypass Expressway [way 31242169],13.014100,80.128677,13.014635,80.129210,80,15,3
+OSM Chennai Bypass Expressway [way 31242169],13.014635,80.129210,13.015162,80.129914,80,15,3
+OSM Chennai Bypass Expressway [way 31242169],13.015162,80.129914,13.016768,80.132025,80,15,3
+OSM Chennai Bypass Expressway [way 31242169],13.016768,80.132025,13.017646,80.133046,80,15,3
+OSM Chennai Bypass Expressway [way 31242169],13.017646,80.133046,13.019887,80.135527,80,15,3
+OSM Chennai Bypass Expressway [way 31242169],13.019887,80.135527,13.020401,80.136163,80,15,3
 OSM Mahatma Gandhi Road [way 31748481],13.090129,80.188297,13.090500,80.188321,30,15,3
 OSM Mahatma Gandhi Road [way 31748481],13.090500,80.188321,13.090711,80.188356,30,15,3
 OSM Mahatma Gandhi Road [way 31748481],13.090711,80.188356,13.091083,80.188418,30,15,3
@@ -2353,260 +2354,260 @@ OSM Subbarayan Salai [way 35200639],13.030994,80.261490,13.031159,80.261607,20,1
 OSM Subbarayan Salai [way 35200639],13.031159,80.261607,13.031272,80.261706,20,15,3
 OSM Subbarayan Salai [way 35200639],13.031272,80.261706,13.031433,80.261854,20,15,3
 OSM Luz Avenue 5th street [way 35432212],13.036311,80.262448,13.035725,80.262379,30,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.622257,80.186819,12.622908,80.188256,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.622908,80.188256,12.623216,80.189003,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.623216,80.189003,12.623620,80.189912,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.623620,80.189912,12.623924,80.190455,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.623924,80.190455,12.624101,80.190699,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.624101,80.190699,12.624390,80.190998,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.624390,80.190998,12.624653,80.191222,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.624653,80.191222,12.625001,80.191439,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.625001,80.191439,12.625573,80.191707,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.625573,80.191707,12.625903,80.191875,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.625903,80.191875,12.626149,80.192024,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.626149,80.192024,12.626535,80.192283,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.626535,80.192283,12.626817,80.192541,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.626817,80.192541,12.627255,80.193032,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.627255,80.193032,12.627546,80.193564,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.627546,80.193564,12.627778,80.194020,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.627778,80.194020,12.627934,80.194236,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.627934,80.194236,12.628070,80.194390,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.628070,80.194390,12.628203,80.194513,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.628203,80.194513,12.628495,80.194720,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.628495,80.194720,12.628649,80.194806,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.628649,80.194806,12.629006,80.194988,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.629006,80.194988,12.629461,80.195138,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.629461,80.195138,12.629895,80.195277,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.629895,80.195277,12.630171,80.195365,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.630171,80.195365,12.631515,80.195795,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.631515,80.195795,12.632066,80.195971,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.632066,80.195971,12.633359,80.196388,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.633359,80.196388,12.634172,80.196656,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.634172,80.196656,12.634714,80.196843,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.634714,80.196843,12.635427,80.197018,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.635427,80.197018,12.635791,80.197124,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.635791,80.197124,12.637219,80.197698,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.637219,80.197698,12.637965,80.197982,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.637965,80.197982,12.639613,80.198717,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.639613,80.198717,12.641217,80.199408,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.641217,80.199408,12.641455,80.199511,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.641455,80.199511,12.642670,80.200029,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.642670,80.200029,12.643131,80.200222,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.643131,80.200222,12.643607,80.200437,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.643607,80.200437,12.643685,80.200476,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.643685,80.200476,12.644303,80.200785,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.644303,80.200785,12.644354,80.200811,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.644354,80.200811,12.644822,80.201043,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.644822,80.201043,12.644838,80.201053,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.644838,80.201053,12.645285,80.201311,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.645285,80.201311,12.645752,80.201594,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.645752,80.201594,12.645851,80.201659,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.645851,80.201659,12.646468,80.202030,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.646468,80.202030,12.646771,80.202211,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.646771,80.202211,12.646899,80.202287,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.646899,80.202287,12.647198,80.202481,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.647198,80.202481,12.648001,80.202963,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.648001,80.202963,12.648216,80.203073,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.648216,80.203073,12.648969,80.203468,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.648969,80.203468,12.649477,80.203722,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.649477,80.203722,12.649780,80.203861,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.649780,80.203861,12.650291,80.204113,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.650291,80.204113,12.650717,80.204320,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.650717,80.204320,12.651189,80.204547,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.651189,80.204547,12.651644,80.204802,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.651644,80.204802,12.651998,80.205002,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.651998,80.205002,12.652153,80.205092,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.652153,80.205092,12.652456,80.205287,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.652456,80.205287,12.652854,80.205536,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.652854,80.205536,12.653277,80.205816,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.653277,80.205816,12.653620,80.206037,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.653620,80.206037,12.654155,80.206381,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654155,80.206381,12.654241,80.206435,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654241,80.206435,12.654369,80.206512,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654369,80.206512,12.654542,80.206609,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654542,80.206609,12.654551,80.206614,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654551,80.206614,12.655088,80.206887,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655088,80.206887,12.655105,80.206896,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655105,80.206896,12.655183,80.206935,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655183,80.206935,12.655315,80.206997,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655315,80.206997,12.655485,80.207082,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655485,80.207082,12.655741,80.207211,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655741,80.207211,12.655960,80.207311,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655960,80.207311,12.656233,80.207444,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.656233,80.207444,12.656636,80.207634,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.656636,80.207634,12.657178,80.207899,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.657178,80.207899,12.657227,80.207920,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.657227,80.207920,12.657473,80.208035,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.657473,80.208035,12.657920,80.208222,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.657920,80.208222,12.658095,80.208305,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.658095,80.208305,12.658321,80.208388,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.658321,80.208388,12.658581,80.208467,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.658581,80.208467,12.658930,80.208580,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.658930,80.208580,12.659238,80.208652,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.659238,80.208652,12.659512,80.208727,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.659512,80.208727,12.659893,80.208792,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.659893,80.208792,12.660118,80.208841,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.660118,80.208841,12.660841,80.208974,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.660841,80.208974,12.661272,80.209039,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.661272,80.209039,12.661681,80.209101,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.661681,80.209101,12.661722,80.209107,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.661722,80.209107,12.662790,80.209240,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.662790,80.209240,12.663295,80.209301,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.663295,80.209301,12.663609,80.209331,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.663609,80.209331,12.664362,80.209397,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.664362,80.209397,12.665171,80.209552,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.665171,80.209552,12.665863,80.209648,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.665863,80.209648,12.667121,80.209779,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.667121,80.209779,12.667995,80.209923,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.667995,80.209923,12.668811,80.210206,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.668811,80.210206,12.670611,80.211043,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.670611,80.211043,12.671578,80.211433,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.671578,80.211433,12.672201,80.211534,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.672201,80.211534,12.672620,80.211558,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.672620,80.211558,12.673420,80.211632,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.673420,80.211632,12.674085,80.211708,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.674085,80.211708,12.674750,80.211844,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.674750,80.211844,12.675361,80.212035,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.675361,80.212035,12.677986,80.212975,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.677986,80.212975,12.678848,80.213314,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.678848,80.213314,12.680641,80.214023,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.680641,80.214023,12.681638,80.214404,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.681638,80.214404,12.683328,80.214922,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.683328,80.214922,12.684480,80.215279,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.684480,80.215279,12.685254,80.215598,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.685254,80.215598,12.686026,80.215834,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.686026,80.215834,12.686474,80.216004,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.686474,80.216004,12.687336,80.216351,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.687336,80.216351,12.688660,80.216987,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.688660,80.216987,12.689300,80.217212,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.689300,80.217212,12.690703,80.217758,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.690703,80.217758,12.691284,80.218005,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.691284,80.218005,12.692619,80.218594,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.692619,80.218594,12.692763,80.218658,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.692763,80.218658,12.693755,80.219087,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.693755,80.219087,12.694272,80.219302,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.694272,80.219302,12.695852,80.220032,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.695852,80.220032,12.696296,80.220218,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.696296,80.220218,12.697980,80.220903,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.697980,80.220903,12.698871,80.221270,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.698871,80.221270,12.699005,80.221322,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.699005,80.221322,12.700258,80.221812,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.700258,80.221812,12.700328,80.221840,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.700328,80.221840,12.701441,80.222285,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.701441,80.222285,12.702752,80.222794,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.702752,80.222794,12.703957,80.223267,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.703957,80.223267,12.704323,80.223399,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.704323,80.223399,12.704664,80.223512,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.704664,80.223512,12.705593,80.223721,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.705593,80.223721,12.706749,80.223872,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.706749,80.223872,12.708427,80.224270,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.708427,80.224270,12.708856,80.224373,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.708856,80.224373,12.709451,80.224568,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.709451,80.224568,12.709928,80.224752,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.709928,80.224752,12.710834,80.225130,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.710834,80.225130,12.711969,80.225566,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.711969,80.225566,12.712309,80.225705,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.712309,80.225705,12.713991,80.226331,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.713991,80.226331,12.714749,80.226606,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.714749,80.226606,12.715522,80.226881,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.715522,80.226881,12.716713,80.227345,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.716713,80.227345,12.717329,80.227579,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.717329,80.227579,12.718561,80.228070,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.718561,80.228070,12.719220,80.228349,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.719220,80.228349,12.719981,80.228670,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.719981,80.228670,12.721168,80.229182,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.721168,80.229182,12.722508,80.229767,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.722508,80.229767,12.723418,80.230141,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.723418,80.230141,12.725131,80.230843,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.725131,80.230843,12.726379,80.231361,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.726379,80.231361,12.727650,80.231882,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.727650,80.231882,12.727790,80.231932,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.727790,80.231932,12.729407,80.232514,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.729407,80.232514,12.729747,80.232641,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.729747,80.232641,12.729844,80.232679,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.729844,80.232679,12.730289,80.232850,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.730289,80.232850,12.730563,80.232955,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.730563,80.232955,12.730647,80.232986,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.730647,80.232986,12.731758,80.233404,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.731758,80.233404,12.732851,80.233898,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.732851,80.233898,12.733481,80.234145,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.733481,80.234145,12.734189,80.234423,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.734189,80.234423,12.734492,80.234541,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.734492,80.234541,12.734998,80.234740,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.734998,80.234740,12.737178,80.235557,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.737178,80.235557,12.737878,80.235838,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.737878,80.235838,12.738390,80.236077,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.738390,80.236077,12.740291,80.236950,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.740291,80.236950,12.740663,80.237121,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.740663,80.237121,12.742051,80.237717,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.742051,80.237717,12.742076,80.237726,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.742076,80.237726,12.743467,80.238227,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.743467,80.238227,12.743499,80.238238,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.743499,80.238238,12.743878,80.238393,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.743878,80.238393,12.744012,80.238447,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.744012,80.238447,12.745085,80.238884,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.745085,80.238884,12.745740,80.239150,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.745740,80.239150,12.745976,80.239241,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.745976,80.239241,12.746278,80.239356,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.746278,80.239356,12.747511,80.239829,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.747511,80.239829,12.748051,80.240036,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.748051,80.240036,12.748291,80.240128,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.748291,80.240128,12.748914,80.240358,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.748914,80.240358,12.749339,80.240510,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.749339,80.240510,12.750196,80.240830,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.750196,80.240830,12.750993,80.241125,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.750993,80.241125,12.753505,80.242037,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.753505,80.242037,12.756146,80.243012,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.756146,80.243012,12.756314,80.243083,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.756314,80.243083,12.758745,80.243948,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.758745,80.243948,12.760639,80.244556,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.760639,80.244556,12.761397,80.244838,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.761397,80.244838,12.762533,80.245223,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.762533,80.245223,12.762581,80.245242,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.762581,80.245242,12.763190,80.245484,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.763190,80.245484,12.763240,80.245503,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.763240,80.245503,12.763315,80.245538,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.763315,80.245538,12.763589,80.245622,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.763589,80.245622,12.764012,80.245747,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.764012,80.245747,12.766563,80.246718,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.766563,80.246718,12.767667,80.247115,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.767667,80.247115,12.768399,80.247378,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.768399,80.247378,12.769146,80.247647,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.769146,80.247647,12.769628,80.247817,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.769628,80.247817,12.771079,80.248261,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.771079,80.248261,12.771847,80.248543,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.771847,80.248543,12.772357,80.248716,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.772357,80.248716,12.772898,80.248853,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.772898,80.248853,12.773663,80.248926,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.773663,80.248926,12.774393,80.248918,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.774393,80.248918,12.774917,80.248933,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.774917,80.248933,12.775228,80.248942,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.775228,80.248942,12.775334,80.248946,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.775334,80.248946,12.775607,80.248947,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.775607,80.248947,12.776480,80.248945,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.776480,80.248945,12.776738,80.248939,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.776738,80.248939,12.777241,80.248877,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.777241,80.248877,12.777609,80.248759,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.777609,80.248759,12.777766,80.248690,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.777766,80.248690,12.777929,80.248611,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.777929,80.248611,12.778141,80.248504,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.778141,80.248504,12.778456,80.248332,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.778456,80.248332,12.779775,80.247620,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.779775,80.247620,12.780570,80.247190,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.780570,80.247190,12.781352,80.246792,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.781352,80.246792,12.781536,80.246691,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.781536,80.246691,12.782043,80.246413,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.782043,80.246413,12.783238,80.245758,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.783238,80.245758,12.783792,80.245503,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.783792,80.245503,12.784097,80.245346,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784097,80.245346,12.784209,80.245289,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784209,80.245289,12.784387,80.245205,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784387,80.245205,12.784440,80.245181,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784440,80.245181,12.784556,80.245126,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784556,80.245126,12.784641,80.245087,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784641,80.245087,12.784734,80.245043,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784734,80.245043,12.784857,80.244986,100,15,3
-OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784857,80.244986,12.785001,80.244918,100,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.622257,80.186819,12.622908,80.188256,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.622908,80.188256,12.623216,80.189003,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.623216,80.189003,12.623620,80.189912,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.623620,80.189912,12.623924,80.190455,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.623924,80.190455,12.624101,80.190699,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.624101,80.190699,12.624390,80.190998,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.624390,80.190998,12.624653,80.191222,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.624653,80.191222,12.625001,80.191439,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.625001,80.191439,12.625573,80.191707,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.625573,80.191707,12.625903,80.191875,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.625903,80.191875,12.626149,80.192024,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.626149,80.192024,12.626535,80.192283,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.626535,80.192283,12.626817,80.192541,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.626817,80.192541,12.627255,80.193032,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.627255,80.193032,12.627546,80.193564,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.627546,80.193564,12.627778,80.194020,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.627778,80.194020,12.627934,80.194236,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.627934,80.194236,12.628070,80.194390,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.628070,80.194390,12.628203,80.194513,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.628203,80.194513,12.628495,80.194720,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.628495,80.194720,12.628649,80.194806,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.628649,80.194806,12.629006,80.194988,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.629006,80.194988,12.629461,80.195138,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.629461,80.195138,12.629895,80.195277,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.629895,80.195277,12.630171,80.195365,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.630171,80.195365,12.631515,80.195795,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.631515,80.195795,12.632066,80.195971,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.632066,80.195971,12.633359,80.196388,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.633359,80.196388,12.634172,80.196656,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.634172,80.196656,12.634714,80.196843,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.634714,80.196843,12.635427,80.197018,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.635427,80.197018,12.635791,80.197124,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.635791,80.197124,12.637219,80.197698,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.637219,80.197698,12.637965,80.197982,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.637965,80.197982,12.639613,80.198717,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.639613,80.198717,12.641217,80.199408,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.641217,80.199408,12.641455,80.199511,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.641455,80.199511,12.642670,80.200029,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.642670,80.200029,12.643131,80.200222,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.643131,80.200222,12.643607,80.200437,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.643607,80.200437,12.643685,80.200476,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.643685,80.200476,12.644303,80.200785,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.644303,80.200785,12.644354,80.200811,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.644354,80.200811,12.644822,80.201043,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.644822,80.201043,12.644838,80.201053,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.644838,80.201053,12.645285,80.201311,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.645285,80.201311,12.645752,80.201594,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.645752,80.201594,12.645851,80.201659,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.645851,80.201659,12.646468,80.202030,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.646468,80.202030,12.646771,80.202211,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.646771,80.202211,12.646899,80.202287,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.646899,80.202287,12.647198,80.202481,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.647198,80.202481,12.648001,80.202963,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.648001,80.202963,12.648216,80.203073,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.648216,80.203073,12.648969,80.203468,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.648969,80.203468,12.649477,80.203722,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.649477,80.203722,12.649780,80.203861,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.649780,80.203861,12.650291,80.204113,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.650291,80.204113,12.650717,80.204320,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.650717,80.204320,12.651189,80.204547,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.651189,80.204547,12.651644,80.204802,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.651644,80.204802,12.651998,80.205002,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.651998,80.205002,12.652153,80.205092,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.652153,80.205092,12.652456,80.205287,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.652456,80.205287,12.652854,80.205536,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.652854,80.205536,12.653277,80.205816,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.653277,80.205816,12.653620,80.206037,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.653620,80.206037,12.654155,80.206381,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654155,80.206381,12.654241,80.206435,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654241,80.206435,12.654369,80.206512,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654369,80.206512,12.654542,80.206609,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654542,80.206609,12.654551,80.206614,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.654551,80.206614,12.655088,80.206887,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655088,80.206887,12.655105,80.206896,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655105,80.206896,12.655183,80.206935,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655183,80.206935,12.655315,80.206997,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655315,80.206997,12.655485,80.207082,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655485,80.207082,12.655741,80.207211,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655741,80.207211,12.655960,80.207311,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.655960,80.207311,12.656233,80.207444,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.656233,80.207444,12.656636,80.207634,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.656636,80.207634,12.657178,80.207899,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.657178,80.207899,12.657227,80.207920,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.657227,80.207920,12.657473,80.208035,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.657473,80.208035,12.657920,80.208222,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.657920,80.208222,12.658095,80.208305,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.658095,80.208305,12.658321,80.208388,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.658321,80.208388,12.658581,80.208467,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.658581,80.208467,12.658930,80.208580,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.658930,80.208580,12.659238,80.208652,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.659238,80.208652,12.659512,80.208727,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.659512,80.208727,12.659893,80.208792,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.659893,80.208792,12.660118,80.208841,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.660118,80.208841,12.660841,80.208974,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.660841,80.208974,12.661272,80.209039,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.661272,80.209039,12.661681,80.209101,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.661681,80.209101,12.661722,80.209107,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.661722,80.209107,12.662790,80.209240,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.662790,80.209240,12.663295,80.209301,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.663295,80.209301,12.663609,80.209331,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.663609,80.209331,12.664362,80.209397,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.664362,80.209397,12.665171,80.209552,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.665171,80.209552,12.665863,80.209648,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.665863,80.209648,12.667121,80.209779,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.667121,80.209779,12.667995,80.209923,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.667995,80.209923,12.668811,80.210206,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.668811,80.210206,12.670611,80.211043,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.670611,80.211043,12.671578,80.211433,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.671578,80.211433,12.672201,80.211534,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.672201,80.211534,12.672620,80.211558,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.672620,80.211558,12.673420,80.211632,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.673420,80.211632,12.674085,80.211708,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.674085,80.211708,12.674750,80.211844,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.674750,80.211844,12.675361,80.212035,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.675361,80.212035,12.677986,80.212975,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.677986,80.212975,12.678848,80.213314,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.678848,80.213314,12.680641,80.214023,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.680641,80.214023,12.681638,80.214404,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.681638,80.214404,12.683328,80.214922,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.683328,80.214922,12.684480,80.215279,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.684480,80.215279,12.685254,80.215598,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.685254,80.215598,12.686026,80.215834,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.686026,80.215834,12.686474,80.216004,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.686474,80.216004,12.687336,80.216351,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.687336,80.216351,12.688660,80.216987,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.688660,80.216987,12.689300,80.217212,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.689300,80.217212,12.690703,80.217758,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.690703,80.217758,12.691284,80.218005,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.691284,80.218005,12.692619,80.218594,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.692619,80.218594,12.692763,80.218658,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.692763,80.218658,12.693755,80.219087,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.693755,80.219087,12.694272,80.219302,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.694272,80.219302,12.695852,80.220032,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.695852,80.220032,12.696296,80.220218,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.696296,80.220218,12.697980,80.220903,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.697980,80.220903,12.698871,80.221270,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.698871,80.221270,12.699005,80.221322,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.699005,80.221322,12.700258,80.221812,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.700258,80.221812,12.700328,80.221840,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.700328,80.221840,12.701441,80.222285,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.701441,80.222285,12.702752,80.222794,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.702752,80.222794,12.703957,80.223267,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.703957,80.223267,12.704323,80.223399,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.704323,80.223399,12.704664,80.223512,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.704664,80.223512,12.705593,80.223721,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.705593,80.223721,12.706749,80.223872,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.706749,80.223872,12.708427,80.224270,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.708427,80.224270,12.708856,80.224373,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.708856,80.224373,12.709451,80.224568,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.709451,80.224568,12.709928,80.224752,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.709928,80.224752,12.710834,80.225130,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.710834,80.225130,12.711969,80.225566,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.711969,80.225566,12.712309,80.225705,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.712309,80.225705,12.713991,80.226331,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.713991,80.226331,12.714749,80.226606,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.714749,80.226606,12.715522,80.226881,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.715522,80.226881,12.716713,80.227345,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.716713,80.227345,12.717329,80.227579,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.717329,80.227579,12.718561,80.228070,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.718561,80.228070,12.719220,80.228349,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.719220,80.228349,12.719981,80.228670,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.719981,80.228670,12.721168,80.229182,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.721168,80.229182,12.722508,80.229767,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.722508,80.229767,12.723418,80.230141,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.723418,80.230141,12.725131,80.230843,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.725131,80.230843,12.726379,80.231361,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.726379,80.231361,12.727650,80.231882,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.727650,80.231882,12.727790,80.231932,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.727790,80.231932,12.729407,80.232514,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.729407,80.232514,12.729747,80.232641,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.729747,80.232641,12.729844,80.232679,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.729844,80.232679,12.730289,80.232850,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.730289,80.232850,12.730563,80.232955,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.730563,80.232955,12.730647,80.232986,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.730647,80.232986,12.731758,80.233404,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.731758,80.233404,12.732851,80.233898,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.732851,80.233898,12.733481,80.234145,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.733481,80.234145,12.734189,80.234423,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.734189,80.234423,12.734492,80.234541,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.734492,80.234541,12.734998,80.234740,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.734998,80.234740,12.737178,80.235557,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.737178,80.235557,12.737878,80.235838,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.737878,80.235838,12.738390,80.236077,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.738390,80.236077,12.740291,80.236950,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.740291,80.236950,12.740663,80.237121,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.740663,80.237121,12.742051,80.237717,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.742051,80.237717,12.742076,80.237726,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.742076,80.237726,12.743467,80.238227,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.743467,80.238227,12.743499,80.238238,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.743499,80.238238,12.743878,80.238393,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.743878,80.238393,12.744012,80.238447,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.744012,80.238447,12.745085,80.238884,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.745085,80.238884,12.745740,80.239150,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.745740,80.239150,12.745976,80.239241,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.745976,80.239241,12.746278,80.239356,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.746278,80.239356,12.747511,80.239829,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.747511,80.239829,12.748051,80.240036,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.748051,80.240036,12.748291,80.240128,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.748291,80.240128,12.748914,80.240358,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.748914,80.240358,12.749339,80.240510,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.749339,80.240510,12.750196,80.240830,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.750196,80.240830,12.750993,80.241125,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.750993,80.241125,12.753505,80.242037,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.753505,80.242037,12.756146,80.243012,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.756146,80.243012,12.756314,80.243083,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.756314,80.243083,12.758745,80.243948,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.758745,80.243948,12.760639,80.244556,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.760639,80.244556,12.761397,80.244838,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.761397,80.244838,12.762533,80.245223,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.762533,80.245223,12.762581,80.245242,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.762581,80.245242,12.763190,80.245484,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.763190,80.245484,12.763240,80.245503,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.763240,80.245503,12.763315,80.245538,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.763315,80.245538,12.763589,80.245622,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.763589,80.245622,12.764012,80.245747,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.764012,80.245747,12.766563,80.246718,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.766563,80.246718,12.767667,80.247115,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.767667,80.247115,12.768399,80.247378,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.768399,80.247378,12.769146,80.247647,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.769146,80.247647,12.769628,80.247817,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.769628,80.247817,12.771079,80.248261,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.771079,80.248261,12.771847,80.248543,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.771847,80.248543,12.772357,80.248716,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.772357,80.248716,12.772898,80.248853,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.772898,80.248853,12.773663,80.248926,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.773663,80.248926,12.774393,80.248918,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.774393,80.248918,12.774917,80.248933,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.774917,80.248933,12.775228,80.248942,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.775228,80.248942,12.775334,80.248946,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.775334,80.248946,12.775607,80.248947,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.775607,80.248947,12.776480,80.248945,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.776480,80.248945,12.776738,80.248939,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.776738,80.248939,12.777241,80.248877,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.777241,80.248877,12.777609,80.248759,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.777609,80.248759,12.777766,80.248690,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.777766,80.248690,12.777929,80.248611,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.777929,80.248611,12.778141,80.248504,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.778141,80.248504,12.778456,80.248332,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.778456,80.248332,12.779775,80.247620,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.779775,80.247620,12.780570,80.247190,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.780570,80.247190,12.781352,80.246792,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.781352,80.246792,12.781536,80.246691,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.781536,80.246691,12.782043,80.246413,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.782043,80.246413,12.783238,80.245758,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.783238,80.245758,12.783792,80.245503,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.783792,80.245503,12.784097,80.245346,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784097,80.245346,12.784209,80.245289,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784209,80.245289,12.784387,80.245205,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784387,80.245205,12.784440,80.245181,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784440,80.245181,12.784556,80.245126,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784556,80.245126,12.784641,80.245087,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784641,80.245087,12.784734,80.245043,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784734,80.245043,12.784857,80.244986,80,15,3
+OSM East Coast Road (Thiruvanmiyur - Mahabalipuram - Marakkanam - Pondicherry Road) [way 45399749],12.784857,80.244986,12.785001,80.244918,80,15,3
 OSM Vishwanathan Street [way 46595293],12.954884,80.148062,12.954203,80.147761,30,15,3
 OSM Vishwanathan Street [way 46595293],12.954203,80.147761,12.953954,80.147653,30,15,3
 OSM Vishwanathan Street [way 46595293],12.953954,80.147653,12.953913,80.147657,30,15,3
@@ -2647,9 +2648,9 @@ OSM Thirumalai Raja Main Street [way 48738673],13.100187,80.229839,13.100341,80.
 OSM Thirumalai Raja Main Street [way 48738673],13.100341,80.229874,13.100495,80.229907,20,15,3
 OSM 30th Street [way 48742029],13.092810,80.223651,13.093370,80.224052,20,15,3
 OSM 30th Street [way 48742029],13.093370,80.224052,13.093593,80.224212,20,15,3
-OSM Maduravoyal Interchange [way 59294072],13.064256,80.161111,13.062950,80.161121,120,15,3
-OSM Maduravoyal Interchange [way 59294072],13.062950,80.161121,13.062090,80.161141,120,15,3
-OSM Maduravoyal Interchange [way 59294072],13.062090,80.161141,13.060797,80.161157,120,15,3
+OSM Maduravoyal Interchange [way 59294072],13.064256,80.161111,13.062950,80.161121,80,15,3
+OSM Maduravoyal Interchange [way 59294072],13.062950,80.161121,13.062090,80.161141,80,15,3
+OSM Maduravoyal Interchange [way 59294072],13.062090,80.161141,13.060797,80.161157,80,15,3
 OSM Vadakkapattu main road [way 60871668],12.920710,80.185528,12.920802,80.185548,10,15,3
 OSM Vadakkapattu main road [way 60871668],12.920802,80.185548,12.921087,80.185613,10,15,3
 OSM Vadakkapattu main road [way 60871668],12.921087,80.185613,12.921117,80.185619,10,15,3
@@ -11917,3 +11918,346 @@ OSM way 1567837823 [way 1567837823],13.056701,80.187819,13.056694,80.187357,10,1
 OSM way 1567837824 [way 1567837824],13.056692,80.187235,13.056694,80.187357,10,15,3
 OSM Poonamallee - Pattabiram Road [way 1570004080],13.056713,80.097570,13.056790,80.097591,30,15,3
 OSM Poonamallee - Pattabiram Road [way 1570004080],13.056790,80.097591,13.056809,80.097613,30,15,3
+Road segment 1729,12.874466,80.078393,12.862221,80.073668,80,40,3
+Road segment 1729,12.862221,80.073668,12.861419,80.073227,80,40,3
+Road segment 1729,12.861419,80.073227,12.859306,80.071817,80,40,3
+Road segment 1729,12.859306,80.071817,12.853334,80.067276,80,40,3
+Road segment 1729,12.853334,80.067276,12.847469,80.063054,80,40,3
+Road segment 1729,12.847469,80.063054,12.844802,80.060765,80,40,3
+Road segment 1729,12.844802,80.060765,12.826672,80.041679,80,40,3
+Road segment 1729,12.826672,80.041679,12.825244,80.040545,80,40,3
+Road segment 1729,12.825244,80.040545,12.814470,80.032885,80,40,3
+Road segment 1729,12.814470,80.032885,12.792295,80.018431,80,40,3
+Road segment 1729,12.792295,80.018431,12.784863,80.014004,80,40,3
+Road segment 1729,12.784863,80.014004,12.770580,80.007592,80,40,3
+Road segment 1729,12.770580,80.007592,12.766310,80.005505,80,40,3
+Road segment 1729,12.766310,80.005505,12.762234,80.003865,80,40,3
+Road segment 1729,12.762234,80.003865,12.760294,80.003408,80,40,3
+Road segment 1729,12.760294,80.003408,12.756662,80.002270,80,40,3
+Road segment 1729,12.756662,80.002270,12.755032,80.001365,80,40,3
+Road segment 1729,12.755032,80.001365,12.750846,79.998629,80,40,3
+Road segment 1729,12.750846,79.998629,12.738781,79.988962,80,40,3
+Road segment 1729,12.738781,79.988962,12.735949,79.987013,80,40,3
+Road segment 1729,12.735949,79.987013,12.735348,79.986389,80,40,3
+Road segment 1729,12.735348,79.986389,12.733746,79.984112,80,40,3
+Road segment 1729,12.733746,79.984112,12.732908,79.983353,80,40,3
+Road segment 1729,12.732908,79.983353,12.732188,79.983067,80,40,3
+Road segment 1729,12.732188,79.983067,12.731241,79.983103,80,40,3
+Road segment 1729,12.731241,79.983103,12.726996,79.982615,80,40,3
+Road segment 1729,12.726996,79.982615,12.721461,79.981345,80,40,3
+Road segment 1729,12.721461,79.981345,12.716652,79.980897,80,40,3
+Road segment 1729,12.716652,79.980897,12.712683,79.979754,80,40,3
+Road segment 1729,12.712683,79.979754,12.711060,79.978599,80,40,3
+Road segment 1729,12.711060,79.978599,12.707343,79.976435,80,40,3
+Road segment 1729,12.707343,79.976435,12.706544,79.975787,80,40,3
+Road segment 1729,12.706544,79.975787,12.702587,79.970709,80,40,3
+Road segment 1729,12.702587,79.970709,12.701383,79.969429,80,40,3
+Road segment 1729,12.701383,79.969429,12.697395,79.967103,80,40,3
+Road segment 1729,12.697395,79.967103,12.692650,79.964557,80,40,3
+Road segment 1729,12.692650,79.964557,12.691528,79.963571,80,40,3
+Road segment 1729,12.691528,79.963571,12.689462,79.960882,80,40,3
+Road segment 1729,12.689462,79.960882,12.688352,79.960130,80,40,3
+Road segment 1729,12.688352,79.960130,12.687543,79.959843,80,40,3
+Road segment 1729,12.687543,79.959843,12.682794,79.958546,80,40,3
+Road segment 1729,12.682794,79.958546,12.668898,79.958716,80,40,3
+Road segment 1729,12.668898,79.958716,12.667753,79.958811,80,40,3
+Road segment 1729,12.667753,79.958811,12.666677,79.959137,80,40,3
+Road segment 1729,12.666677,79.959137,12.663947,79.960646,80,40,3
+Road segment 1729,12.663947,79.960646,12.662678,79.961084,80,40,3
+Road segment 1729,12.662678,79.961084,12.661259,79.961138,80,40,3
+Road segment 1729,12.661259,79.961138,12.659830,79.960682,80,40,3
+Road segment 1729,12.659830,79.960682,12.658802,79.959953,80,40,3
+Road segment 1729,12.658802,79.959953,12.657874,79.958772,80,40,3
+Road segment 1729,12.657874,79.958772,12.655828,79.953471,80,40,3
+Road segment 1729,12.655828,79.953471,12.655745,79.952976,80,40,3
+Road segment 1729,12.655745,79.952976,12.655751,79.952298,80,40,3
+Road segment 1729,12.655751,79.952298,12.657988,79.944299,80,40,3
+Road segment 1729,12.657988,79.944299,12.657839,79.943260,80,40,3
+Road segment 1729,12.657839,79.943260,12.657104,79.942301,80,40,3
+Road segment 1729,12.657104,79.942301,12.656468,79.941976,80,40,3
+Road segment 1729,12.656468,79.941976,12.655620,79.941893,80,40,3
+Road segment 1729,12.655620,79.941893,12.653728,79.942282,80,40,3
+Road segment 1729,12.653728,79.942282,12.652780,79.942285,80,40,3
+Road segment 1729,12.652780,79.942285,12.647074,79.940455,80,40,3
+Road segment 1729,12.647074,79.940455,12.646108,79.940030,80,40,3
+Road segment 1729,12.646108,79.940030,12.639917,79.936383,80,40,3
+Road segment 1729,12.639917,79.936383,12.635399,79.933517,80,40,3
+Road segment 1729,12.635399,79.933517,12.631441,79.931815,80,40,3
+Road segment 1729,12.631441,79.931815,12.631109,79.931788,80,40,3
+Road segment 1729,12.631109,79.931788,12.621832,79.927662,80,40,3
+Road segment 1729,12.621832,79.927662,12.617145,79.926419,80,40,3
+Road segment 1729,12.617145,79.926419,12.615695,79.925932,80,40,3
+Road segment 1729,12.615695,79.925932,12.607356,79.921256,80,40,3
+Road segment 1729,12.607356,79.921256,12.606939,79.921252,80,40,3
+Road segment 1729,12.606939,79.921252,12.603073,79.920339,80,40,3
+Road segment 1729,12.603073,79.920339,12.593751,79.919288,80,40,3
+Road segment 1729,12.593751,79.919288,12.585359,79.919465,80,40,3
+Road segment 1729,12.585359,79.919465,12.582219,79.919091,80,40,3
+Road segment 1729,12.582219,79.919091,12.580614,79.918641,80,40,3
+Road segment 1729,12.580614,79.918641,12.577947,79.917504,80,40,3
+Road segment 1729,12.577947,79.917504,12.573036,79.916543,80,40,3
+Road segment 1729,12.573036,79.916543,12.565795,79.914584,80,40,3
+Road segment 1729,12.565795,79.914584,12.564935,79.914195,80,40,3
+Road segment 1729,12.564935,79.914195,12.555458,79.908684,80,40,3
+Road segment 1729,12.555458,79.908684,12.550442,79.906358,80,40,3
+Road segment 1729,12.550442,79.906358,12.538372,79.903946,80,40,3
+Road segment 1729,12.538372,79.903946,12.534203,79.901456,80,40,3
+Road segment 1729,12.534203,79.901456,12.532259,79.900659,80,40,3
+Road segment 1729,12.532259,79.900659,12.527632,79.898311,80,40,3
+Road segment 1729,12.527632,79.898311,12.522789,79.896073,80,40,3
+Road segment 1729,12.522789,79.896073,12.522136,79.895672,80,40,3
+Road segment 1729,12.522136,79.895672,12.515391,79.889116,80,40,3
+Road segment 1729,12.515391,79.889116,12.514862,79.888737,80,40,3
+Road segment 1729,12.514862,79.888737,12.512519,79.886205,80,40,3
+Road segment 1729,12.512519,79.886205,12.511213,79.885280,80,40,3
+Road segment 1729,12.511213,79.885280,12.510785,79.885097,80,40,3
+Road segment 1729,12.510785,79.885097,12.508973,79.884709,80,40,3
+Road segment 1729,12.508973,79.884709,12.508718,79.882636,80,40,3
+Road segment 1729,12.508718,79.882636,12.508324,79.882078,80,40,3
+Road segment 1729,12.508324,79.882078,12.506757,79.880855,80,40,3
+Road segment 1729,12.506757,79.880855,12.506117,79.880183,80,40,3
+Road segment 1729,12.506117,79.880183,12.494947,79.871270,80,40,3
+Road segment 1729,12.494947,79.871270,12.490041,79.866858,80,40,3
+Road segment 1729,12.490041,79.866858,12.485304,79.863752,80,40,3
+Road segment 1729,12.485304,79.863752,12.481576,79.861011,80,40,3
+Road segment 1729,12.481576,79.861011,12.477312,79.859194,80,40,3
+Road segment 1729,12.477312,79.859194,12.476204,79.858503,80,40,3
+Road segment 1729,12.476204,79.858503,12.469983,79.853170,80,40,3
+Road segment 1729,12.469983,79.853170,12.464810,79.849337,80,40,3
+Road segment 1729,12.464810,79.849337,12.455585,79.842890,80,40,3
+Road segment 1729,12.455585,79.842890,12.450046,79.839766,80,40,3
+Road segment 1729,12.450046,79.839766,12.443946,79.837698,80,40,3
+Road segment 1729,12.443946,79.837698,12.442006,79.836886,80,40,3
+Road segment 1729,12.442006,79.836886,12.439266,79.835651,80,40,3
+Road segment 1729,12.439266,79.835651,12.433693,79.832826,80,40,3
+Road segment 1729,12.433693,79.832826,12.430169,79.831711,80,40,3
+Road segment 1729,12.430169,79.831711,12.424916,79.830535,80,40,3
+Road segment 1729,12.424916,79.830535,12.423644,79.830125,80,40,3
+Road segment 1729,12.423644,79.830125,12.417174,79.826581,80,40,3
+Road segment 1729,12.417174,79.826581,12.408398,79.821241,80,40,3
+Road segment 1729,12.408398,79.821241,12.407893,79.820724,80,40,3
+Road segment 1729,12.407893,79.820724,12.407619,79.820135,80,40,3
+Road segment 1729,12.407619,79.820135,12.406753,79.815488,80,40,3
+Road segment 1729,12.406753,79.815488,12.406192,79.814477,80,40,3
+Road segment 1729,12.406192,79.814477,12.405825,79.814085,80,40,3
+Road segment 1729,12.405825,79.814085,12.395433,79.806110,80,40,3
+Road segment 1729,12.395433,79.806110,12.394012,79.804864,80,40,3
+Road segment 1729,12.394012,79.804864,12.380660,79.790241,80,40,3
+Road segment 1729,12.380660,79.790241,12.379677,79.789420,80,40,3
+Road segment 1729,12.379677,79.789420,12.369931,79.783992,80,40,3
+Road segment 1729,12.369931,79.783992,12.354793,79.779467,80,40,3
+Road segment 1729,12.354793,79.779467,12.353370,79.779236,80,40,3
+Road segment 1729,12.353370,79.779236,12.350997,79.779194,80,40,3
+Road segment 1729,12.350997,79.779194,12.340302,79.781453,80,40,3
+Road segment 1729,12.340302,79.781453,12.338873,79.781552,80,40,3
+Road segment 1729,12.338873,79.781552,12.337924,79.781284,80,40,3
+Road segment 1729,12.337924,79.781284,12.335570,79.780132,80,40,3
+Road segment 1729,12.335570,79.780132,12.326839,79.775136,80,40,3
+Road segment 1729,12.326839,79.775136,12.325968,79.774454,80,40,3
+Road segment 1729,12.325968,79.774454,12.321927,79.769338,80,40,3
+Road segment 1729,12.321927,79.769338,12.316411,79.763151,80,40,3
+Road segment 1729,12.316411,79.763151,12.315866,79.762247,80,40,3
+Road segment 1729,12.315866,79.762247,12.314717,79.759763,80,40,3
+Road segment 1729,12.314717,79.759763,12.311964,79.756537,80,40,3
+Road segment 1729,12.311964,79.756537,12.308002,79.750947,80,40,3
+Road segment 1729,12.308002,79.750947,12.305892,79.747589,80,40,3
+Road segment 1729,12.305892,79.747589,12.300218,79.739883,80,40,3
+Road segment 1729,12.300218,79.739883,12.299534,79.738646,80,40,3
+Road segment 1729,12.299534,79.738646,12.298544,79.736173,80,40,3
+Road segment 1729,12.298544,79.736173,12.286514,79.715353,80,40,3
+Road segment 1729,12.286514,79.715353,12.280500,79.706183,80,40,3
+Road segment 1729,12.280500,79.706183,12.279657,79.704429,80,40,3
+Road segment 1729,12.279657,79.704429,12.276401,79.696409,80,40,3
+Road segment 1729,12.276401,79.696409,12.275499,79.694830,80,40,3
+Road segment 1729,12.275499,79.694830,12.274139,79.692800,80,40,3
+Road segment 1729,12.274139,79.692800,12.270880,79.689416,80,40,3
+Road segment 1729,12.270880,79.689416,12.269895,79.688146,80,40,3
+Road segment 1729,12.269895,79.688146,12.268499,79.685970,80,40,3
+Road segment 1729,12.268499,79.685970,12.267849,79.685259,80,40,3
+Road segment 1729,12.267849,79.685259,12.259445,79.678699,80,40,3
+Road segment 1729,12.259445,79.678699,12.256276,79.675729,80,40,3
+Road segment 1729,12.256276,79.675729,12.252996,79.673562,80,40,3
+Road segment 1729,12.252996,79.673562,12.246250,79.668405,80,40,3
+Road segment 1729,12.246250,79.668405,12.240695,79.663651,80,40,3
+Road segment 1729,12.240695,79.663651,12.240087,79.663287,80,40,3
+Road segment 1729,12.240087,79.663287,12.239265,79.663017,80,40,3
+Road segment 1729,12.239265,79.663017,12.239307,79.662541,80,40,3
+Road segment 1729,12.239307,79.662541,12.238937,79.662148,80,40,3
+Road segment 1729,12.238937,79.662148,12.228180,79.653411,80,40,3
+Road segment 1729,12.228180,79.653411,12.225882,79.649587,80,40,3
+Road segment 1729,12.225882,79.649587,12.225247,79.648973,80,40,3
+Road segment 1729,12.225247,79.648973,12.223585,79.647797,80,40,3
+Road segment 1729,12.223585,79.647797,12.223366,79.647435,80,40,3
+Road segment 1729,12.223366,79.647435,12.215117,79.641535,80,40,3
+Road segment 1729,12.215117,79.641535,12.214655,79.641367,80,40,3
+Road segment 1729,12.214655,79.641367,12.214151,79.641563,80,40,3
+Road segment 1729,12.214151,79.641563,12.213710,79.640859,80,40,3
+Road segment 1729,12.213710,79.640859,12.212811,79.639975,80,40,3
+Road segment 1729,12.212811,79.639975,12.206823,79.637049,80,40,3
+Road segment 1729,12.206823,79.637049,12.199268,79.631894,80,40,3
+Road segment 1729,12.199268,79.631894,12.195028,79.628685,80,40,3
+Road segment 1729,12.195028,79.628685,12.193741,79.628018,80,40,3
+Road segment 1729,12.193741,79.628018,12.187360,79.625341,80,40,3
+Road segment 1729,12.187360,79.625341,12.176161,79.618805,80,40,3
+Road segment 1729,12.176161,79.618805,12.151815,79.605132,80,40,3
+Road segment 1729,12.151815,79.605132,12.143723,79.599021,80,40,3
+Road segment 1729,12.143723,79.599021,12.136854,79.594019,80,40,3
+Road segment 1729,12.136854,79.594019,12.125228,79.587576,80,40,3
+Road segment 1729,12.125228,79.587576,12.117116,79.581756,80,40,3
+Road segment 1729,12.117116,79.581756,12.116382,79.581064,80,40,3
+Road segment 1729,12.116382,79.581064,12.115739,79.580178,80,40,3
+Road segment 1729,12.115739,79.580178,12.115199,79.578792,80,40,3
+Road segment 1729,12.115199,79.578792,12.114596,79.576429,80,40,3
+Road segment 1729,12.114596,79.576429,12.113838,79.575273,80,40,3
+Road segment 1729,12.113838,79.575273,12.112953,79.574662,80,40,3
+Road segment 1729,12.112953,79.574662,12.110591,79.573426,80,40,3
+Road segment 1729,12.110591,79.573426,12.100995,79.567858,80,40,3
+Road segment 1729,12.100995,79.567858,12.097840,79.564774,80,40,3
+Road segment 1729,12.097840,79.564774,12.096704,79.563873,80,40,3
+Road segment 1729,12.096704,79.563873,12.093320,79.562240,80,40,3
+Road segment 1729,12.093320,79.562240,12.074283,79.551046,80,40,3
+Road segment 1729,12.074283,79.551046,12.073331,79.550596,80,40,3
+Road segment 1729,12.073331,79.550596,12.064523,79.547431,80,40,3
+Road segment 1729,12.064523,79.547431,12.062404,79.546858,80,40,3
+Road segment 1729,12.062404,79.546858,12.055668,79.545843,80,40,3
+Road segment 1729,12.055668,79.545843,12.046982,79.544232,80,40,3
+Road segment 1729,12.046982,79.544232,12.045175,79.543941,80,40,3
+Road segment 1729,12.045175,79.543941,12.042201,79.543735,80,40,3
+Road segment 1729,12.042201,79.543735,12.040852,79.543296,80,40,3
+Road segment 1729,12.040852,79.543296,12.040614,79.543555,80,40,3
+Road segment 1729,12.040614,79.543555,12.038426,79.543428,80,40,3
+Road segment 1729,12.038426,79.543428,12.036801,79.543826,80,40,3
+Road segment 1729,12.036801,79.543826,12.035210,79.543695,80,40,3
+Road segment 1729,12.035210,79.543695,12.034434,79.543497,80,40,3
+Road segment 1729,12.034434,79.543497,12.032567,79.542282,80,40,3
+Road segment 1729,12.032567,79.542282,12.032245,79.541846,80,40,3
+Road segment 1729,12.032245,79.541846,12.030687,79.541491,80,40,3
+Road segment 1729,12.030687,79.541491,12.026513,79.539379,80,40,3
+Road segment 1729,12.026513,79.539379,12.018830,79.534884,80,40,3
+Road segment 1729,12.018830,79.534884,12.015539,79.534160,80,40,3
+Road segment 1729,12.015539,79.534160,12.014218,79.533390,80,40,3
+Road segment 1729,12.014218,79.533390,12.010987,79.530468,80,40,3
+Road segment 1729,12.010987,79.530468,12.005354,79.524488,80,40,3
+Road segment 1729,12.005354,79.524488,12.004107,79.522893,80,40,3
+Road segment 1729,12.004107,79.522893,12.000533,79.517805,80,40,3
+Road segment 1729,12.000533,79.517805,11.999156,79.515655,80,40,3
+Road segment 1729,11.999156,79.515655,11.998310,79.514801,80,40,3
+Road segment 1729,11.998310,79.514801,11.997197,79.514323,80,40,3
+Road segment 1729,11.997197,79.514323,11.985275,79.510958,80,40,3
+Road segment 1729,11.985275,79.510958,11.981249,79.508867,80,40,3
+Road segment 1730,12.508797,79.889498,12.504934,79.889554,50,40,3
+Road segment 1730,12.504934,79.889554,12.482333,79.888673,50,40,3
+Road segment 1730,12.482333,79.888673,12.466131,79.888312,50,40,3
+Road segment 1730,12.466131,79.888312,12.461511,79.888315,50,40,3
+Road segment 1730,12.461511,79.888315,12.409774,79.891184,50,40,3
+Road segment 1730,12.409774,79.891184,12.403259,79.891443,50,40,3
+Road segment 1730,12.403259,79.891443,12.401892,79.891667,50,40,3
+Road segment 1730,12.401892,79.891667,12.378780,79.896957,50,40,3
+Road segment 1730,12.378780,79.896957,12.359311,79.901143,50,40,3
+Road segment 1730,12.359311,79.901143,12.345174,79.901411,50,40,3
+Road segment 1730,12.345174,79.901411,12.305356,79.901176,50,40,3
+Road segment 1730,12.305356,79.901176,12.258718,79.900623,50,40,3
+Road segment 1730,12.258718,79.900623,12.258696,79.900698,50,40,3
+Road segment 1731,13.078772,80.251572,13.078738,80.250077,40,40,3
+Road segment 1731,13.078738,80.250077,13.077984,80.246194,40,40,3
+Road segment 1731,13.077984,80.246194,13.077494,80.241838,40,40,3
+Road segment 1731,13.077494,80.241838,13.075502,80.232948,40,40,3
+Road segment 1731,13.075502,80.232948,13.074109,80.229074,40,40,3
+Road segment 1731,13.074109,80.229074,13.073812,80.226340,40,40,3
+Road segment 1731,13.073812,80.226340,13.074199,80.221834,40,40,3
+Road segment 1731,13.074199,80.221834,13.074902,80.217863,40,40,3
+Road segment 1731,13.074902,80.217863,13.075282,80.214827,40,40,3
+Road segment 1731,13.075282,80.214827,13.075679,80.213774,40,40,3
+Road segment 1731,13.075679,80.213774,13.076888,80.211954,40,40,3
+Road segment 1731,13.076888,80.211954,13.077083,80.210654,40,40,3
+Road segment 1731,13.077083,80.210654,13.077119,80.208964,40,40,3
+Road segment 1731,13.077119,80.208964,13.076999,80.206931,40,40,3
+Road segment 1731,13.076999,80.206931,13.076276,80.202891,40,40,3
+Road segment 1731,13.076276,80.202891,13.076383,80.200523,40,40,3
+Road segment 1731,13.076383,80.200523,13.076140,80.199300,40,40,3
+Road segment 1732,13.076977,80.240596,13.077334,80.240612,40,40,3
+Road segment 1732,13.077334,80.240612,13.077362,80.240713,40,40,3
+Road segment 1732,13.077362,80.240713,13.075951,80.240537,40,40,3
+Road segment 1732,13.075951,80.240537,13.073903,80.240596,40,40,3
+Road segment 1732,13.073903,80.240596,13.072724,80.240972,40,40,3
+Road segment 1732,13.072724,80.240972,13.071364,80.241748,40,40,3
+Road segment 1732,13.071364,80.241748,13.067884,80.242825,40,40,3
+Road segment 1732,13.067884,80.242825,13.066336,80.243467,40,40,3
+Road segment 1732,13.066336,80.243467,13.066120,80.244047,40,40,3
+Road segment 1732,13.066120,80.244047,13.066345,80.245461,40,40,3
+Road segment 1732,13.066345,80.245461,13.066544,80.245951,40,40,3
+Road segment 1732,13.066544,80.245951,13.067658,80.246407,40,40,3
+Road segment 1732,13.067658,80.246407,13.067896,80.246720,40,40,3
+Road segment 1732,13.067896,80.246720,13.067925,80.247747,40,40,3
+Road segment 1732,13.067925,80.247747,13.067652,80.247967,40,40,3
+Road segment 1732,13.067652,80.247967,13.061852,80.247637,40,40,3
+Road segment 1732,13.061852,80.247637,13.061380,80.247201,40,40,3
+Road segment 1732,13.061380,80.247201,13.061375,80.246977,40,40,3
+Road segment 1732,13.061375,80.246977,13.061885,80.246379,40,40,3
+Road segment 1732,13.061885,80.246379,13.062042,80.245638,40,40,3
+Road segment 1732,13.062042,80.245638,13.062262,80.245206,40,40,3
+Road segment 1732,13.062262,80.245206,13.063084,80.244635,40,40,3
+Road segment 1732,13.063084,80.244635,13.063817,80.243497,40,40,3
+Road segment 1732,13.063817,80.243497,13.065757,80.243544,40,40,3
+Road segment 1732,13.065757,80.243544,13.066109,80.243455,40,40,3
+Road segment 1733,12.785188,80.244942,12.784722,80.245167,60,40,3
+Road segment 1733,12.784722,80.245167,12.784641,80.245087,60,40,3
+Road segment 1733,12.784641,80.245087,12.789606,80.242780,60,40,3
+Road segment 1733,12.789606,80.242780,12.795457,80.241134,60,40,3
+Road segment 1733,12.795457,80.241134,12.796968,80.241262,60,40,3
+Road segment 1733,12.796968,80.241262,12.807914,80.243308,60,40,3
+Road segment 1733,12.807914,80.243308,12.809440,80.243430,60,40,3
+Road segment 1733,12.809440,80.243430,12.811083,80.243090,60,40,3
+Road segment 1733,12.811083,80.243090,12.816869,80.240728,60,40,3
+Road segment 1733,12.816869,80.240728,12.818053,80.240481,60,40,3
+Road segment 1733,12.818053,80.240481,12.821635,80.240123,60,40,3
+Road segment 1733,12.821635,80.240123,12.832623,80.240483,60,40,3
+Road segment 1733,12.832623,80.240483,12.836905,80.240344,60,40,3
+Road segment 1733,12.836905,80.240344,12.847714,80.240820,60,40,3
+Road segment 1733,12.847714,80.240820,12.852970,80.241421,60,40,3
+Road segment 1733,12.852970,80.241421,12.862804,80.242030,60,40,3
+Road segment 1733,12.862804,80.242030,12.865654,80.242522,60,40,3
+Road segment 1733,12.865654,80.242522,12.868572,80.243470,60,40,3
+Road segment 1733,12.868572,80.243470,12.869292,80.243501,60,40,3
+Road segment 1733,12.869292,80.243501,12.871567,80.243164,60,40,3
+Road segment 1733,12.871567,80.243164,12.872836,80.243150,60,40,3
+Road segment 1733,12.872836,80.243150,12.875827,80.243454,60,40,3
+Road segment 1733,12.875827,80.243454,12.878303,80.243880,60,40,3
+Road segment 1733,12.878303,80.243880,12.880353,80.244596,60,40,3
+Road segment 1733,12.880353,80.244596,12.885957,80.245640,60,40,3
+Road segment 1733,12.885957,80.245640,12.886845,80.245673,60,40,3
+Road segment 1733,12.886845,80.245673,12.888517,80.245334,60,40,3
+Road segment 1733,12.888517,80.245334,12.890010,80.245501,60,40,3
+Road segment 1733,12.890010,80.245501,12.894476,80.246710,60,40,3
+Road segment 1733,12.894476,80.246710,12.898524,80.247605,60,40,3
+Road segment 1733,12.898524,80.247605,12.901285,80.248615,60,40,3
+Road segment 1733,12.901285,80.248615,12.904953,80.249094,60,40,3
+Road segment 1733,12.904953,80.249094,12.908236,80.249812,60,40,3
+Road segment 1733,12.908236,80.249812,12.917939,80.250610,60,40,3
+Road segment 1733,12.917939,80.250610,12.919106,80.250826,60,40,3
+Road segment 1733,12.919106,80.250826,12.920538,80.251336,60,40,3
+Road segment 1733,12.920538,80.251336,12.922462,80.251013,60,40,3
+Road segment 1733,12.922462,80.251013,12.926112,80.251223,60,40,3
+Road segment 1733,12.926112,80.251223,12.939968,80.252803,60,40,3
+Road segment 1733,12.939968,80.252803,12.946735,80.253966,60,40,3
+Road segment 1733,12.946735,80.253966,12.950347,80.254956,60,40,3
+Road segment 1733,12.950347,80.254956,12.957228,80.255235,60,40,3
+Road segment 1733,12.957228,80.255235,12.962277,80.256330,60,40,3
+Road segment 1733,12.962277,80.256330,12.964963,80.256590,60,40,3
+Road segment 1733,12.964963,80.256590,12.967083,80.256981,60,40,3
+Road segment 1733,12.967083,80.256981,12.970898,80.258058,60,40,3
+Road segment 1733,12.970898,80.258058,12.972529,80.258045,60,40,3
+Road segment 1733,12.972529,80.258045,12.973658,80.258248,60,40,3
+Road segment 1733,12.973658,80.258248,12.976824,80.259070,60,40,3
+Road segment 1733,12.976824,80.259070,12.978881,80.259037,60,40,3
+Road segment 1733,12.978881,80.259037,12.980705,80.259283,60,40,3
+Road segment 1733,12.980705,80.259283,12.983791,80.259429,60,40,3
+Road segment 1734,12.795484,80.241298,12.795919,80.248930,30,40,3
+Road segment 1735,13.086608,80.234643,13.086536,80.235182,30,40,3
+Road segment 1735,13.086536,80.235182,13.086705,80.235219,30,40,3
+Road segment 1735,13.086705,80.235219,13.086620,80.235792,30,40,3
+Road segment 1735,13.086620,80.235792,13.086149,80.236950,30,40,3
+Road segment 1735,13.086149,80.236950,13.085542,80.238012,30,40,3
+Road segment 1735,13.085542,80.238012,13.085328,80.239485,30,40,3
+Road segment 1736,13.085329,80.239463,13.085307,80.239852,20,40,3
+Road segment 1736,13.085307,80.239852,13.083692,80.239628,20,40,3
