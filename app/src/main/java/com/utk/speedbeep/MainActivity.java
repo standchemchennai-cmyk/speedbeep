@@ -466,6 +466,10 @@ public final class MainActivity extends Activity {
     }
 
     private void setQuickCurrentRoadLimit() {
+        if (CentralRoadStore.MODE_VANILLA.equals(CentralRoadStore.mode(this))) {
+            toast("GitHub vanilla is read-only. Choose Vanilla + Local Overrides to edit road limits.");
+            return;
+        }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_LOCATION);
             return;
@@ -558,9 +562,20 @@ public final class MainActivity extends Activity {
                 for (RoadSegment part : parts) meters += RoadLimitEditor.lengthM(part);
                 final double updatedLengthM = meters;
 
-                List<RoadSegment> updated = RoadLimitEditor.override(
-                        currentRoads, parts, newLimit, roadName);
-                LocalRoadStore.saveForProfile(this, editProfileId, updated);
+                // The GitHub master must remain untouched. In combined mode only
+                // persist the changed geometry to this profile's override layer.
+                String saveMode = CentralRoadStore.mode(this);
+                if (CentralRoadStore.MODE_VANILLA.equals(saveMode)) {
+                    throw new IOException("GitHub vanilla is read-only. Choose Vanilla + Local Overrides.");
+                }
+                if (CentralRoadStore.MODE_PLUS_LOCAL.equals(saveMode)) {
+                    CentralRoadStore.addOverride(
+                            this, editProfileId, parts, newLimit, roadName);
+                } else {
+                    List<RoadSegment> updated = RoadLimitEditor.override(
+                            currentRoads, parts, newLimit, roadName);
+                    LocalRoadStore.saveForProfile(this, editProfileId, updated);
+                }
                 runOnUiThread(() -> {
                     quickSaving = false;
                     quickSetButton.setEnabled(true);
