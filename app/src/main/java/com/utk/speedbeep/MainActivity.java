@@ -115,185 +115,272 @@ public final class MainActivity extends Activity {
         refreshCsvInfo();
     }
 
+    // Main-screen colors only. Dialogs keep their native Android theme.
+    private static final int UI_BG = 0xFF0C1422;
+    private static final int UI_CARD = 0xFF172337;
+    private static final int UI_CARD_EDGE = 0xFF293A51;
+    private static final int UI_TEXT = 0xFFF1F6FC;
+    private static final int UI_MUTED = 0xFFABBCD0;
+    private static final int UI_ACCENT = 0xFF67E5BC;
+    private static final int UI_BUTTON = 0xFF263951;
+    private TextView monitoringStatusText;
+
     private View buildUi() {
-        int pad = dp(20);
+        getWindow().setStatusBarColor(UI_BG);
+        getWindow().setNavigationBarColor(UI_BG);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(pad, pad, pad, pad);
+        root.setPadding(dp(16), dp(24), dp(16), dp(28));
+        root.setBackgroundColor(UI_BG);
 
-        TextView title = new TextView(this);
-        title.setText("SpeedBeep");
-        title.setTextSize(28);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
+        TextView title = dashboardLabel("SpeedBeep", 30, true, UI_TEXT);
         root.addView(title);
-
-        TextView subtitle = new TextView(this);
-        subtitle.setText("GitHub master + offline road profiles • no account");
-        subtitle.setTextSize(15);
-        subtitle.setPadding(0, dp(4), 0, dp(20));
+        TextView subtitle = dashboardLabel("Your speed, road limits and alerts", 14, false, UI_MUTED);
+        subtitle.setPadding(0, dp(3), 0, dp(18));
         root.addView(subtitle);
 
-        bigSpeed = new TextView(this);
-        bigSpeed.setText("—");
-        bigSpeed.setTextSize(64);
-        bigSpeed.setTypeface(Typeface.DEFAULT_BOLD);
-        bigSpeed.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.addView(bigSpeed, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        // The essentials remain on screen, with no settings to navigate past.
+        LinearLayout speedCard = dashboardCard(root);
+        monitoringStatusText = dashboardLabel("● Monitoring off", 14, true, UI_MUTED);
+        speedCard.addView(monitoringStatusText);
 
-        TextView speedLabel = new TextView(this);
-        speedLabel.setText("GPS km/h");
-        speedLabel.setGravity(Gravity.CENTER_HORIZONTAL);
-        speedLabel.setTextSize(14);
-        speedLabel.setPadding(0, 0, 0, dp(18));
-        root.addView(speedLabel);
+        bigSpeed = dashboardLabel("—", 88, true, UI_TEXT);
+        bigSpeed.setGravity(Gravity.CENTER);
+        bigSpeed.setIncludeFontPadding(false);
+        bigSpeed.setPadding(0, dp(10), 0, 0);
+        speedCard.addView(bigSpeed, new LinearLayout.LayoutParams(-1, dp(105)));
 
-        roadText = label("Road: —", 20, true);
-        limitText = label("Limit: —", 26, true);
-        detailText = label("Stopped", 15, false);
-        detailText.setPadding(0, dp(8), 0, dp(16));
-        root.addView(roadText);
-        root.addView(limitText);
-        universalStatusText = label("Universal ceiling: OFF", 18, true);
-        root.addView(universalStatusText);
-        root.addView(detailText);
+        TextView speedUnit = dashboardLabel("km/h  •  GPS SPEED", 13, true, UI_MUTED);
+        speedUnit.setGravity(Gravity.CENTER);
+        speedUnit.setPadding(0, 0, 0, dp(20));
+        speedCard.addView(speedUnit);
 
-        LinearLayout buttons = new LinearLayout(this);
-        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        View divider = new View(this);
+        divider.setBackgroundColor(UI_CARD_EDGE);
+        speedCard.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+
+        limitText = dashboardLabel("Road limit: —", 23, true, UI_TEXT);
+        limitText.setPadding(0, dp(16), 0, dp(4));
+        speedCard.addView(limitText);
+        roadText = dashboardLabel("Road: —", 15, false, UI_MUTED);
+        speedCard.addView(roadText);
+        universalStatusText = dashboardLabel("Universal ceiling: OFF", 13, true, UI_ACCENT);
+        universalStatusText.setPadding(0, dp(10), 0, 0);
+        speedCard.addView(universalStatusText);
+
+        LinearLayout controls = new LinearLayout(this);
+        controls.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams controlsLayout = new LinearLayout.LayoutParams(-1, dp(56));
+        controlsLayout.topMargin = dp(12);
+        root.addView(controls, controlsLayout);
         startButton = new Button(this);
-        startButton.setText("START");
+        startButton.setText("Start monitoring");
+        styleDashboardButton(startButton, true);
         stopButton = new Button(this);
-        stopButton.setText("STOP");
-        buttons.addView(startButton, new LinearLayout.LayoutParams(0, dp(56), 1));
-        buttons.addView(stopButton, new LinearLayout.LayoutParams(0, dp(56), 1));
-        root.addView(buttons);
+        stopButton.setText("Stop");
+        styleDashboardButton(stopButton, false);
+        LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(0, -1, 2f);
+        startLp.rightMargin = dp(8);
+        controls.addView(startButton, startLp);
+        controls.addView(stopButton, new LinearLayout.LayoutParams(0, -1, 1f));
         startButton.setOnClickListener(v -> startMonitoring());
         stopButton.setOnClickListener(v -> stopMonitoring());
 
-        TextView quickTitle = label("Set speed limit for this road", 18, true);
-        quickTitle.setPadding(0, dp(12), 0, dp(3));
-        root.addView(quickTitle);
+        LinearLayout quickCard = dashboardCard(root);
+        TextView quickTitle = dashboardLabel("Quick road limit", 19, true, UI_TEXT);
+        quickCard.addView(quickTitle);
+        TextView quickSubtitle = dashboardLabel("Save a verified limit for the road you're on.", 13, false, UI_MUTED);
+        quickSubtitle.setPadding(0, dp(3), 0, dp(8));
+        quickCard.addView(quickSubtitle);
 
-        // Two actions from the main screen: type km/h, tap SET THIS ROAD.
         LinearLayout quickRow = new LinearLayout(this);
         quickRow.setOrientation(LinearLayout.HORIZONTAL);
         quickRow.setGravity(Gravity.CENTER_VERTICAL);
         quickLimitInput = new EditText(this);
         quickLimitInput.setSingleLine(true);
         quickLimitInput.setHint("km/h");
+        quickLimitInput.setHintTextColor(UI_MUTED);
+        quickLimitInput.setTextColor(UI_TEXT);
         quickLimitInput.setInputType(InputType.TYPE_CLASS_NUMBER);
         quickLimitInput.setSelectAllOnFocus(true);
-        quickLimitInput.setTextSize(22f);
+        quickLimitInput.setTextSize(21f);
         quickLimitInput.setContentDescription("New road speed limit in kilometres per hour");
-        quickRow.addView(quickLimitInput,
-                new LinearLayout.LayoutParams(0, dp(56), 1));
+        quickRow.addView(quickLimitInput, new LinearLayout.LayoutParams(0, dp(54), 1f));
 
         quickSetButton = new Button(this);
-        quickSetButton.setText("SET THIS ROAD");
+        quickSetButton.setText("Save limit");
+        styleDashboardButton(quickSetButton, true);
         quickSetButton.setOnClickListener(v -> setQuickCurrentRoadLimit());
-        quickRow.addView(quickSetButton, new LinearLayout.LayoutParams(0, dp(56), 2));
-        root.addView(quickRow);
+        LinearLayout.LayoutParams quickSaveLp = new LinearLayout.LayoutParams(0, dp(52), 1.3f);
+        quickSaveLp.leftMargin = dp(8);
+        quickRow.addView(quickSetButton, quickSaveLp);
+        quickCard.addView(quickRow);
 
-        quickRoadHint = label("Finding your current road…", 14, false);
-        quickRoadHint.setPadding(0, dp(4), 0, dp(3));
-        root.addView(quickRoadHint);
-        quickSavedHint = label("Uses your live GPS road match. Save only verified speed limits.", 13, false);
-        root.addView(quickSavedHint);
-
-        activeProfileText = label("Active CSV: checking…", 19, true);
-        root.addView(activeProfileText);
-
-        Button csvSource = new Button(this);
-        csvSource.setText("CSV SOURCE: VANILLA / VANILLA + LOCAL / STANDALONE");
-        csvSource.setOnClickListener(v -> showCsvSourceDialog());
-        root.addView(csvSource);
-
-        Button refreshMaster = new Button(this);
-        refreshMaster.setText("REFRESH GITHUB MASTER CSV NOW");
-        refreshMaster.setOnClickListener(v -> refreshOnlineMaster());
-        root.addView(refreshMaster);
-        onlineStatusText = label("GitHub CSV: using bundled or cached copy", 13, false);
-        root.addView(onlineStatusText);
-
-        Button profiles = new Button(this);
-        profiles.setText("SELECT / MANAGE CSV PROFILES");
-        profiles.setOnClickListener(v -> showProfileManager());
-        root.addView(profiles, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
-
-        Button exportButton = new Button(this);
-        exportButton.setText("EXPORT EFFECTIVE CSV (ALL ROADS)");
-        exportButton.setOnClickListener(v -> exportCsv());
-        root.addView(exportButton, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        quickRoadHint = dashboardLabel("Finding your current road…", 13, false, UI_MUTED);
+        quickRoadHint.setPadding(0, dp(10), 0, dp(2));
+        quickCard.addView(quickRoadHint);
+        quickSavedHint = dashboardLabel("Uses live GPS. Save only verified speed limits.", 12, false, UI_MUTED);
+        quickCard.addView(quickSavedHint);
 
         tripMap = new OSMTripMap(this);
-        Button openMap = new Button(this);
-        openMap.setText("OPEN FULL-SCREEN MAP");
-        openMap.setOnClickListener(v -> showMapDialog());
-        root.addView(openMap, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
-        TextView mapHelp = label("Full-screen OpenStreetMap: follow GPS, pinch/drag, see nearby saved road limits and edit a stretch. Internet needed for uncached tiles.", 13, false);
-        root.addView(mapHelp);
+        dashboardAction(root, "Open full-screen map", v -> showMapDialog(), false);
 
-        alarmButton = new Button(this);
-        alarmButton.setOnClickListener(v -> showAlarmSettings());
+        // All specialist tools are available, but stay out of the driving view.
+        LinearLayout alerts = expandableSection(root, "Alerts & speed limits",
+                "Alarm sound, universal ceiling, unmapped roads", "alerts");
+        alarmButton = dashboardAction(alerts, "Alarm sound", v -> showAlarmSettings(), false);
         updateAlarmButton();
-        root.addView(alarmButton);
-
-        // Separate from the user-defined unmapped-road fallback. This ceiling
-        // applies on every reliable GPS fix, even if no road is matched.
-        universalButton = new Button(this);
-        universalButton.setOnClickListener(v -> showUniversalSettings());
-        root.addView(universalButton);
+        universalButton = dashboardAction(alerts, "Universal speed ceiling",
+                v -> showUniversalSettings(), false);
         updateUniversalButton();
+        dashboardAction(alerts, "Unmapped-road limit", v -> showFallbackSettings(), false);
 
-        Button fallbackButton = new Button(this);
-        fallbackButton.setText("UNMAPPED ROAD SPEED SETTINGS");
-        fallbackButton.setOnClickListener(v -> showFallbackSettings());
-        root.addView(fallbackButton);
+        LinearLayout editing = expandableSection(root, "Road editing",
+                "Manage saved limits and map stretches", "editing");
+        dashboardAction(editing, "Edit saved road limits", v -> chooseRoadToEdit(), false);
+        dashboardAction(editing, "Whole road or one segment", v -> chooseCurrentRoadLimit(), false);
+        dashboardAction(editing, "Select a stretch on the map", v -> chooseMapStretch(), false);
 
-        Button editButton = new Button(this);
-        editButton.setText("EDIT CONFIGURED ROAD LIMITS");
-        editButton.setOnClickListener(v -> chooseRoadToEdit());
-        root.addView(editButton);
+        LinearLayout profiles = expandableSection(root, "Profiles & CSV data",
+                "Data source, sync, import and export", "profiles");
+        activeProfileText = dashboardLabel("Active profile: checking…", 15, true, UI_TEXT);
+        activeProfileText.setPadding(0, dp(6), 0, dp(8));
+        profiles.addView(activeProfileText);
+        dashboardAction(profiles, "Choose CSV source", v -> showCsvSourceDialog(), false);
+        dashboardAction(profiles, "Manage profiles", v -> showProfileManager(), false);
+        dashboardAction(profiles, "Refresh GitHub road data", v -> refreshOnlineMaster(), false);
+        onlineStatusText = dashboardLabel("GitHub CSV: using bundled or cached copy",
+                13, false, UI_MUTED);
+        onlineStatusText.setPadding(0, dp(8), 0, dp(6));
+        profiles.addView(onlineStatusText);
+        csvText = dashboardLabel("CSV: checking…", 13, false, UI_MUTED);
+        csvText.setPadding(0, 0, 0, dp(4));
+        profiles.addView(csvText);
+        dashboardAction(profiles, "Import speed_limits.csv", v -> chooseCsv(), false);
+        dashboardAction(profiles, "Export effective CSV", v -> exportCsv(), false);
 
-        Button currentRoadButton = new Button(this);
-        currentRoadButton.setText("ADVANCED: ENTIRE ROAD OR ONE SEGMENT");
-        currentRoadButton.setOnClickListener(v -> chooseCurrentRoadLimit());
-        root.addView(currentRoadButton);
-
-        Button pickStretchButton = new Button(this);
-        pickStretchButton.setText("SELECT A STRETCH ON MAP (SNAP TO ROAD)");
-        pickStretchButton.setOnClickListener(v -> chooseMapStretch());
-        root.addView(pickStretchButton);
-
-        csvText = label("CSV: checking…", 14, false);
-        csvText.setPadding(0, dp(22), 0, dp(8));
-        root.addView(csvText);
-
-        Button importButton = new Button(this);
-        importButton.setText("IMPORT SPEED_LIMITS.CSV");
-        importButton.setOnClickListener(v -> chooseCsv());
-        root.addView(importButton, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
-
-        Button exportLog = new Button(this);
-        exportLog.setText("EXPORT DRIVE DIAGNOSTICS");
-        exportLog.setOnClickListener(v -> {
+        LinearLayout diagnostics = expandableSection(root, "Diagnostics & help",
+                "GPS details, drive logs and CSV format", "diagnostics");
+        detailText = dashboardLabel("Stopped", 13, false, UI_MUTED);
+        detailText.setPadding(0, dp(6), 0, dp(10));
+        diagnostics.addView(detailText);
+        dashboardAction(diagnostics, "Export drive diagnostics", v -> {
             Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
             i.addCategory(Intent.CATEGORY_OPENABLE);
             i.setType("text/csv");
             i.putExtra(Intent.EXTRA_TITLE, "drive_diagnostics.csv");
             startActivityForResult(i, REQ_LOG_EXPORT);
-        });
-        root.addView(exportLog);
-
-        TextView help = label("CSV columns:\nname,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph\n\nUse several short rows for curved roads. V1 warns only on roads in your CSV. Tap Start after getting into the car; monitoring continues with the screen off.", 14, false);
-        help.setPadding(0, dp(18), 0, dp(12));
-        root.addView(help);
+        }, false);
+        TextView help = dashboardLabel(
+                "CSV columns:\nname,start_lat,start_lon,end_lat,end_lon,limit_kph,corridor_m,margin_kph"
+                + "\n\nUse short segments for curved roads. Monitoring continues with the screen off.",
+                12, false, UI_MUTED);
+        help.setPadding(0, dp(14), 0, dp(2));
+        diagnostics.addView(help);
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(UI_BG);
         scroll.addView(root);
         return scroll;
+    }
+
+    private TextView dashboardLabel(String text, int sp, boolean bold, int color) {
+        TextView view = label(text, sp, bold);
+        view.setTextColor(color);
+        return view;
+    }
+
+    private android.graphics.drawable.GradientDrawable roundedDashboardBg(int fill, int radius) {
+        android.graphics.drawable.GradientDrawable shape =
+                new android.graphics.drawable.GradientDrawable();
+        shape.setColor(fill);
+        shape.setCornerRadius(dp(radius));
+        return shape;
+    }
+
+    private LinearLayout dashboardCard(LinearLayout parent) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(18), dp(18), dp(18), dp(18));
+        card.setBackground(roundedDashboardBg(UI_CARD, 18));
+        LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-1, -2);
+        layout.bottomMargin = dp(12);
+        parent.addView(card, layout);
+        return card;
+    }
+
+    private void styleDashboardButton(Button button, boolean primary) {
+        button.setAllCaps(false);
+        button.setTextSize(14);
+        button.setTypeface(Typeface.DEFAULT_BOLD);
+        button.setTextColor(primary ? UI_BG : UI_TEXT);
+        button.setBackground(roundedDashboardBg(primary ? UI_ACCENT : UI_BUTTON, 12));
+        button.setPadding(dp(10), 0, dp(10), 0);
+        button.setMinHeight(dp(48));
+    }
+
+    private Button dashboardAction(LinearLayout parent, String caption,
+            View.OnClickListener click, boolean primary) {
+        Button button = new Button(this);
+        button.setText(caption);
+        styleDashboardButton(button, primary);
+        button.setOnClickListener(click);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(50));
+        lp.topMargin = dp(8);
+        parent.addView(button, lp);
+        return button;
+    }
+
+    private LinearLayout expandableSection(LinearLayout parent, String title,
+            String subtitle, String key) {
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setBackground(roundedDashboardBg(UI_CARD, 18));
+        LinearLayout.LayoutParams shellLp = new LinearLayout.LayoutParams(-1, -2);
+        shellLp.topMargin = dp(10);
+        parent.addView(shell, shellLp);
+
+        LinearLayout heading = new LinearLayout(this);
+        heading.setOrientation(LinearLayout.HORIZONTAL);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        heading.setPadding(dp(18), dp(15), dp(18), dp(15));
+        shell.addView(heading, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout headingLabels = new LinearLayout(this);
+        headingLabels.setOrientation(LinearLayout.VERTICAL);
+        heading.addView(headingLabels, new LinearLayout.LayoutParams(0, -2, 1f));
+        headingLabels.addView(dashboardLabel(title, 17, true, UI_TEXT));
+        TextView summary = dashboardLabel(subtitle, 12, false, UI_MUTED);
+        summary.setPadding(0, dp(3), dp(8), 0);
+        headingLabels.addView(summary);
+        TextView chevron = dashboardLabel("⌄", 26, true, UI_ACCENT);
+        chevron.setGravity(Gravity.CENTER);
+        heading.addView(chevron, new LinearLayout.LayoutParams(dp(32), dp(42)));
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), 0, dp(16), dp(16));
+        shell.addView(content, new LinearLayout.LayoutParams(-1, -2));
+
+        SharedPreferences uiPrefs = getSharedPreferences("speedbeep_dashboard_ui", MODE_PRIVATE);
+        boolean expanded = uiPrefs.getBoolean(key, false);
+        content.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        chevron.setText(expanded ? "⌃" : "⌄");
+        heading.setContentDescription(title + (expanded ? ", expanded" : ", collapsed")
+                + ". Double tap to toggle.");
+        heading.setClickable(true);
+        heading.setFocusable(true);
+        heading.setOnClickListener(v -> {
+            boolean show = content.getVisibility() != View.VISIBLE;
+            content.setVisibility(show ? View.VISIBLE : View.GONE);
+            chevron.setText(show ? "⌃" : "⌄");
+            heading.setContentDescription(title + (show ? ", expanded" : ", collapsed")
+                    + ". Double tap to toggle.");
+            uiPrefs.edit().putBoolean(key, show).apply();
+        });
+        return content;
     }
 
     private TextView label(String text, int sp, boolean bold) {
@@ -1811,6 +1898,14 @@ public final class MainActivity extends Activity {
             if (System.currentTimeMillis() - lastMapReload > 5000) {
                 lastMapReload = System.currentTimeMillis();
                 tripMap.reloadTrip();
+            }
+        }
+        if (monitoringStatusText != null) {
+            monitoringStatusText.setText(running ? "● Monitoring active" : "● Monitoring off");
+            monitoringStatusText.setTextColor(running ? UI_ACCENT : UI_MUTED);
+            if (running && note != null && note.startsWith("WARNING")) {
+                monitoringStatusText.setText("● GPS update delayed");
+                monitoringStatusText.setTextColor(0xFFFFC970);
             }
         }
         bigSpeed.setText(running ? String.format(Locale.US, "%.0f", speed) : "—");
